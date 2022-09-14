@@ -58,7 +58,7 @@ namespace CryptoExchangeNet
         /// Retrieve the server time for the purpose of syncing time between client and server to prevent authentication issues
         /// </summary>
         /// <returns>Server time</returns>
-        protected abstract Task<WebCallResult<DateTime>> GetServerTimestampAsync();
+        protected abstract Task<WebCallResult<DateTimeOffset>> GetServerTimestampAsync();
 
         internal async Task<WebCallResult<bool>> SyncTimeAsync()
         {
