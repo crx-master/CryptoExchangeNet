@@ -1,8 +1,8 @@
-﻿using CryptoExchange.Net.Objects;
+﻿using SharpCryptoExchange.Objects;
 using NUnit.Framework;
 using System.Globalization;
 
-namespace CryptoExchange.Net.UnitTests
+namespace SharpCryptoExchange.UnitTests
 {
     [TestFixture()]
     public class ExchangeHelpersTests

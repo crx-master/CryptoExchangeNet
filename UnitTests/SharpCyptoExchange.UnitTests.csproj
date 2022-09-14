@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CryptoExchange.Net\CryptoExchange.Net.csproj" />
+    <ProjectReference Include="..\SharpCryptoExchange\SharpCryptoExchange.csproj" />
   </ItemGroup>
 
 </Project>

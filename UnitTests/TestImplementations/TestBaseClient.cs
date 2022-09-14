@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net.Http;
-using CryptoExchange.Net.Authentication;
-using CryptoExchange.Net.Objects;
+using SharpCryptoExchange.Authentication;
+using SharpCryptoExchange.Objects;
 using Microsoft.Extensions.Logging;
 
-namespace CryptoExchange.Net.UnitTests
+namespace SharpCryptoExchange.UnitTests
 {
     public class TestBaseClient: BaseClient
     {       

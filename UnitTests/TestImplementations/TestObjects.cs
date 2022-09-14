@@ -1,6 +1,6 @@
 ﻿using Newtonsoft.Json;
 
-namespace CryptoExchange.Net.UnitTests.TestImplementations
+namespace SharpCryptoExchange.UnitTests.TestImplementations
 {
     public class TestObject
     {

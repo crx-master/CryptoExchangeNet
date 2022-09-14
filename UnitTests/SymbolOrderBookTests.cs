@@ -2,13 +2,13 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using CryptoExchange.Net.Interfaces;
-using CryptoExchange.Net.Objects;
-using CryptoExchange.Net.OrderBook;
-using CryptoExchange.Net.Sockets;
+using SharpCryptoExchange.Interfaces;
+using SharpCryptoExchange.Objects;
+using SharpCryptoExchange.OrderBook;
+using SharpCryptoExchange.Sockets;
 using NUnit.Framework;
 
-namespace CryptoExchange.Net.UnitTests
+namespace SharpCryptoExchange.UnitTests
 {
     [TestFixture]
     public class SymbolOrderBookTests

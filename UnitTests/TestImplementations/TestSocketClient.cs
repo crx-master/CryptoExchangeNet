@@ -1,14 +1,15 @@
 ﻿using System;
 using System.Threading.Tasks;
-using CryptoExchange.Net.Authentication;
-using CryptoExchange.Net.Interfaces;
-using CryptoExchange.Net.Logging;
-using CryptoExchange.Net.Objects;
-using CryptoExchange.Net.Sockets;
+using SharpCryptoExchange.Authentication;
+using SharpCryptoExchange.Interfaces;
+using SharpCryptoExchange.Logging;
+using SharpCryptoExchange.Objects;
+using SharpCryptoExchange.Sockets;
 using Moq;
 using Newtonsoft.Json.Linq;
+using System.Diagnostics.CodeAnalysis;
 
-namespace CryptoExchange.Net.UnitTests.TestImplementations
+namespace SharpCryptoExchange.UnitTests.TestImplementations
 {
     public class TestSocketClient: BaseSocketClient
     {
@@ -36,33 +37,33 @@ namespace CryptoExchange.Net.UnitTests.TestImplementations
             return ConnectSocketAsync(sub).Result;
         }
 
-        protected internal override bool HandleQueryResponse<T>(SocketConnection s, object request, JToken data, out CallResult<T> callResult)
+
+        protected override bool HandleQueryResponse<T>(SocketConnection socketConnection, object request, JToken data, [NotNullWhen(true)] out CallResult<T> callResult)
         {
             throw new NotImplementedException();
         }
 
-        protected internal override bool HandleSubscriptionResponse(SocketConnection s, SocketSubscription subscription, object request, JToken message,
-            out CallResult<object> callResult)
+        protected override bool HandleSubscriptionResponse(SocketConnection socketConnection, SocketSubscription subscription, object request, JToken data, out CallResult<object> callResult)
         {
             throw new NotImplementedException();
         }
 
-        protected internal override bool MessageMatchesHandler(SocketConnection s, JToken message, object request)
+        protected override bool MessageMatchesHandler(SocketConnection socketConnection, JToken message, object request)
         {
             throw new NotImplementedException();
         }
 
-        protected internal override bool MessageMatchesHandler(SocketConnection s, JToken message, string identifier)
-        {
-            return true;
-        }
-
-        protected internal override Task<CallResult<bool>> AuthenticateSocketAsync(SocketConnection s)
+        protected override bool MessageMatchesHandler(SocketConnection socketConnection, JToken message, string identifier)
         {
             throw new NotImplementedException();
         }
 
-        protected internal override Task<bool> UnsubscribeAsync(SocketConnection connection, SocketSubscription s)
+        protected override Task<CallResult<bool>> AuthenticateSocketAsync(SocketConnection socketConnection)
+        {
+            throw new NotImplementedException();
+        }
+
+        protected override Task<bool> UnsubscribeAsync(SocketConnection connection, SocketSubscription subscriptionToUnsub)
         {
             throw new NotImplementedException();
         }

@@ -2,7 +2,7 @@
 using System;
 using System.Text;
 
-namespace CryptoExchange.Net.UnitTests.TestImplementations
+namespace SharpCryptoExchange.UnitTests.TestImplementations
 {
     public class TestStringLogger : ILogger
     {

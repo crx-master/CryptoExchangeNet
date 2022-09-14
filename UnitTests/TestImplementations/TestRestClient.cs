@@ -1,5 +1,5 @@
-﻿using CryptoExchange.Net.Interfaces;
-using CryptoExchange.Net.Objects;
+﻿using SharpCryptoExchange.Interfaces;
+using SharpCryptoExchange.Objects;
 using Moq;
 using Newtonsoft.Json.Linq;
 using System;
@@ -10,10 +10,10 @@ using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using CryptoExchange.Net.Authentication;
+using SharpCryptoExchange.Authentication;
 using System.Collections.Generic;
 
-namespace CryptoExchange.Net.UnitTests.TestImplementations
+namespace SharpCryptoExchange.UnitTests.TestImplementations
 {
     public class TestRestClient: BaseRestClient
     {
@@ -130,7 +130,7 @@ namespace CryptoExchange.Net.UnitTests.TestImplementations
         protected override AuthenticationProvider CreateAuthenticationProvider(ApiCredentials credentials)
             => new TestAuthProvider(credentials);
 
-        protected override Task<WebCallResult<DateTime>> GetServerTimestampAsync()
+        protected override Task<WebCallResult<DateTimeOffset>> GetServerTimestampAsync()
         {
             throw new NotImplementedException();
         }
@@ -156,7 +156,7 @@ namespace CryptoExchange.Net.UnitTests.TestImplementations
         protected override AuthenticationProvider CreateAuthenticationProvider(ApiCredentials credentials)
             => new TestAuthProvider(credentials);
 
-        protected override Task<WebCallResult<DateTime>> GetServerTimestampAsync()
+        protected override Task<WebCallResult<DateTimeOffset>> GetServerTimestampAsync()
         {
             throw new NotImplementedException();
         }

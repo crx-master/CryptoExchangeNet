@@ -1,12 +1,12 @@
-﻿using CryptoExchange.Net.Authentication;
-using CryptoExchange.Net.Objects;
-using CryptoExchange.Net.UnitTests.TestImplementations;
+﻿using SharpCryptoExchange.Authentication;
+using SharpCryptoExchange.Objects;
+using SharpCryptoExchange.UnitTests.TestImplementations;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 
-namespace CryptoExchange.Net.UnitTests
+namespace SharpCryptoExchange.UnitTests
 {
     [TestFixture()]
     public class BaseClientTests

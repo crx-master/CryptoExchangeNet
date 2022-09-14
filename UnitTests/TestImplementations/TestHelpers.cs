@@ -2,7 +2,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
-namespace CryptoExchange.Net.UnitTests.TestImplementations
+namespace SharpCryptoExchange.UnitTests.TestImplementations
 {
     public class TestHelpers
     {

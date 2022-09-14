@@ -1,20 +1,20 @@
-﻿using CryptoExchange.Net.Authentication;
-using CryptoExchange.Net.Objects;
-using CryptoExchange.Net.UnitTests.TestImplementations;
+﻿using SharpCryptoExchange.Authentication;
+using SharpCryptoExchange.Objects;
+using SharpCryptoExchange.UnitTests.TestImplementations;
 using Newtonsoft.Json;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using CryptoExchange.Net.Interfaces;
+using SharpCryptoExchange.Interfaces;
 using Microsoft.Extensions.Logging;
 using System.Net.Http;
 using System.Threading.Tasks;
-using CryptoExchange.Net.Logging;
+using SharpCryptoExchange.Logging;
 using System.Threading;
 
-namespace CryptoExchange.Net.UnitTests
+namespace SharpCryptoExchange.UnitTests
 {
     [TestFixture()]
     public class RestClientTests

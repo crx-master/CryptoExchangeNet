@@ -1,5 +1,5 @@
-﻿using CryptoExchange.Net.Attributes;
-using CryptoExchange.Net.Converters;
+﻿using SharpCryptoExchange.Attributes;
+using SharpCryptoExchange.Converters;
 using Newtonsoft.Json;
 using NUnit.Framework;
 using System;
@@ -8,7 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CryptoExchange.Net.UnitTests
+namespace SharpCryptoExchange.UnitTests
 {
     [TestFixture()]
     public class ConverterTests

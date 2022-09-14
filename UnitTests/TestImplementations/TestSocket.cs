@@ -2,10 +2,10 @@
 using System.Security.Authentication;
 using System.Text;
 using System.Threading.Tasks;
-using CryptoExchange.Net.Interfaces;
-using CryptoExchange.Net.Objects;
+using SharpCryptoExchange.Interfaces;
+using SharpCryptoExchange.Objects;
 
-namespace CryptoExchange.Net.UnitTests.TestImplementations
+namespace SharpCryptoExchange.UnitTests.TestImplementations
 {
     public class TestSocket: IWebsocket
     {
