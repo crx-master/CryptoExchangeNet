@@ -5,7 +5,7 @@ namespace SharpCryptoExchange.CommonObjects
     /// <summary>
     /// Kline data
     /// </summary>
-    public class Kline: BaseCommonObject
+    public class Kline : BaseCommonObject
     {
         /// <summary>
         /// Opening time of the kline

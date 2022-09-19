@@ -1,6 +1,6 @@
+using Microsoft.Extensions.Logging;
 using SharpCryptoExchange.Interfaces;
 using SharpCryptoExchange.Logging;
-using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -17,8 +17,8 @@ namespace SharpCryptoExchange.Objects
     /// </summary>
     public class RateLimiter : IRateLimiter
     {
-        private readonly object _limiterLock = new object();
-        internal List<Limiter> Limiters = new List<Limiter>();
+        private readonly object _limiterLock = new();
+        internal List<Limiter> Limiters = new();
 
         /// <summary>
         /// Create a new RateLimiter. Configure the rate limiter by calling <see cref="AddTotalRateLimit"/>, 
@@ -35,7 +35,7 @@ namespace SharpCryptoExchange.Objects
         /// <param name="perTimePeriod">The time period the limit is for</param>
         public RateLimiter AddTotalRateLimit(int limit, TimeSpan perTimePeriod)
         {
-            lock(_limiterLock)
+            lock (_limiterLock)
                 Limiters.Add(new TotalRateLimiter(limit, perTimePeriod, null));
             return this;
         }
@@ -50,7 +50,7 @@ namespace SharpCryptoExchange.Objects
         /// <param name="excludeFromOtherRateLimits">If set to true it ignores other rate limits</param>
         public RateLimiter AddEndpointLimit(string endpoint, int limit, TimeSpan perTimePeriod, HttpMethod? method = null, bool excludeFromOtherRateLimits = false)
         {
-            lock(_limiterLock)
+            lock (_limiterLock)
                 Limiters.Add(new EndpointRateLimiter(new[] { endpoint }, limit, perTimePeriod, method, excludeFromOtherRateLimits));
             return this;
         }
@@ -65,7 +65,7 @@ namespace SharpCryptoExchange.Objects
         /// <param name="excludeFromOtherRateLimits">If set to true it ignores other rate limits</param>
         public RateLimiter AddEndpointLimit(IEnumerable<string> endpoints, int limit, TimeSpan perTimePeriod, HttpMethod? method = null, bool excludeFromOtherRateLimits = false)
         {
-            lock(_limiterLock)
+            lock (_limiterLock)
                 Limiters.Add(new EndpointRateLimiter(endpoints.ToArray(), limit, perTimePeriod, method, excludeFromOtherRateLimits));
             return this;
         }
@@ -81,7 +81,7 @@ namespace SharpCryptoExchange.Objects
         /// <param name="countPerEndpoint">Whether all requests for this partial endpoint are bound to the same limit or each individual endpoint has its own limit</param>
         public RateLimiter AddPartialEndpointLimit(string endpoint, int limit, TimeSpan perTimePeriod, HttpMethod? method = null, bool countPerEndpoint = false, bool ignoreOtherRateLimits = false)
         {
-            lock(_limiterLock)
+            lock (_limiterLock)
                 Limiters.Add(new PartialEndpointRateLimiter(new[] { endpoint }, limit, perTimePeriod, method, ignoreOtherRateLimits, countPerEndpoint));
             return this;
         }
@@ -95,7 +95,7 @@ namespace SharpCryptoExchange.Objects
         /// <param name="excludeFromTotalRateLimit">Exclude requests with API key from the total rate limiter</param>
         public RateLimiter AddApiKeyLimit(int limit, TimeSpan perTimePeriod, bool onlyForSignedRequests, bool excludeFromTotalRateLimit)
         {
-            lock(_limiterLock)
+            lock (_limiterLock)
                 Limiters.Add(new ApiKeyRateLimiter(limit, perTimePeriod, null, onlyForSignedRequests, excludeFromTotalRateLimit));
             return this;
         }
@@ -107,8 +107,8 @@ namespace SharpCryptoExchange.Objects
 
             EndpointRateLimiter? endpointLimit;
             lock (_limiterLock)
-                endpointLimit = Limiters.OfType<EndpointRateLimiter>().SingleOrDefault(h => h.Endpoints.Contains(endpoint) && (h.Method  == null || h.Method == method));
-            if(endpointLimit != null)
+                endpointLimit = Limiters.OfType<EndpointRateLimiter>().SingleOrDefault(h => h.Endpoints.Contains(endpoint) && (h.Method == null || h.Method == method));
+            if (endpointLimit != null)
             {
                 var waitResult = await ProcessTopic(log, endpointLimit, endpoint, requestWeight, limitBehaviour, ct).ConfigureAwait(false);
                 if (!waitResult)
@@ -154,7 +154,7 @@ namespace SharpCryptoExchange.Objects
                 }
             }
 
-            if(partialEndpointLimits.Any(p => p.IgnoreOtherRateLimits))
+            if (partialEndpointLimits.Any(p => p.IgnoreOtherRateLimits))
                 return new CallResult<int>(totalWaitTime);
 
             ApiKeyRateLimiter? apiLimit;
@@ -162,7 +162,7 @@ namespace SharpCryptoExchange.Objects
                 apiLimit = Limiters.OfType<ApiKeyRateLimiter>().SingleOrDefault(h => h.Type == RateLimitType.ApiKey);
             if (apiLimit != null)
             {
-                if(apiKey == null)
+                if (apiKey == null)
                 {
                     if (!apiLimit.OnlyForSignedRequests)
                     {
@@ -241,7 +241,7 @@ namespace SharpCryptoExchange.Objects
                         break;
                 }
 
-                var currentWeight = !historyTopic.Entries.Any() ? 0: historyTopic.Entries.Sum(h => h.Weight);
+                var currentWeight = !historyTopic.Entries.Any() ? 0 : historyTopic.Entries.Sum(h => h.Weight);
                 if (currentWeight + requestWeight > historyTopic.Limit)
                 {
                     if (currentWeight == 0)
@@ -330,13 +330,13 @@ namespace SharpCryptoExchange.Objects
             }
         }
 
-        internal class EndpointRateLimiter: Limiter
+        internal class EndpointRateLimiter : Limiter
         {
             public string[] Endpoints { get; set; }
             public bool IgnoreOtherRateLimits { get; set; }
 
             public EndpointRateLimiter(string[] endpoints, int limit, TimeSpan perPeriod, HttpMethod? method, bool ignoreOtherRateLimits)
-                :base(RateLimitType.Endpoint, limit, perPeriod, method)
+                : base(RateLimitType.Endpoint, limit, perPeriod, method)
             {
                 Endpoints = endpoints;
                 IgnoreOtherRateLimits = ignoreOtherRateLimits;
@@ -374,31 +374,31 @@ namespace SharpCryptoExchange.Objects
             public bool IgnoreTotalRateLimit { get; set; }
 
             public ApiKeyRateLimiter(int limit, TimeSpan perPeriod, HttpMethod? method, bool onlyForSignedRequests, bool ignoreTotalRateLimit)
-                :base(RateLimitType.ApiKey, limit, perPeriod, method)
+                : base(RateLimitType.ApiKey, limit, perPeriod, method)
             {
                 OnlyForSignedRequests = onlyForSignedRequests;
                 IgnoreTotalRateLimit = ignoreTotalRateLimit;
             }
         }
 
-        internal class SingleTopicRateLimiter: Limiter
+        internal class SingleTopicRateLimiter : Limiter
         {
             public object Topic { get; set; }
 
             public SingleTopicRateLimiter(object topic, Limiter limiter)
-                :base(limiter.Type, limiter.Limit, limiter.Period, limiter.Method)
+                : base(limiter.Type, limiter.Limit, limiter.Period, limiter.Method)
             {
                 Topic = topic;
             }
 
             public override string ToString()
             {
-                return (Type == RateLimitType.ApiKey ? nameof(ApiKeyRateLimiter): nameof(EndpointRateLimiter)) + $": {Topic}";
+                return (Type == RateLimitType.ApiKey ? nameof(ApiKeyRateLimiter) : nameof(EndpointRateLimiter)) + $": {Topic}";
             }
         }
 
-        internal enum RateLimitType 
-        { 
+        internal enum RateLimitType
+        {
             Total,
             Endpoint,
             PartialEndpoint,

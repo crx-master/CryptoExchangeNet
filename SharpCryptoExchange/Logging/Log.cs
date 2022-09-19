@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 
 namespace SharpCryptoExchange.Logging
 {
@@ -26,7 +25,7 @@ namespace SharpCryptoExchange.Logging
         /// </summary>
         public string ClientName { get; set; }
 
-        private readonly object _lock = new object();
+        private readonly object _lock = new();
 
         /// <summary>
         /// ctor
@@ -58,14 +57,13 @@ namespace SharpCryptoExchange.Logging
             if (Level != null && (int)logLevel < (int)Level)
                 return;
 
-            var logMessage = $"{ClientName,-10} | {message}";
             lock (_lock)
             {
                 foreach (var writer in writers)
                 {
                     try
                     {
-                        writer.Log(logLevel, logMessage);
+                        writer.Log(logLevel, "{ClientName,-10} | {message}", ClientName, message);
                     }
                     catch (Exception e)
                     {

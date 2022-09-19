@@ -1,8 +1,8 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using Newtonsoft.Json;
 
 namespace SharpCryptoExchange.Converters
 {
@@ -10,14 +10,14 @@ namespace SharpCryptoExchange.Converters
     /// Base class for enum converters
     /// </summary>
     /// <typeparam name="T">Type of enum to convert</typeparam>
-    public abstract class BaseConverter<T>: JsonConverter where T: struct
+    public abstract class BaseConverter<T> : JsonConverter where T : struct
     {
         /// <summary>
         /// The enum->string mapping
         /// </summary>
         protected abstract List<KeyValuePair<T, string>> Mapping { get; }
         private readonly bool quotes;
-        
+
         /// <summary>
         /// ctor
         /// </summary>
@@ -30,7 +30,7 @@ namespace SharpCryptoExchange.Converters
         /// <inheritdoc />
         public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
         {
-            var stringValue = value == null? null: GetValue((T) value);
+            var stringValue = value == null ? null : GetValue((T)value);
             if (quotes)
                 writer.WriteValue(stringValue);
             else
@@ -77,7 +77,7 @@ namespace SharpCryptoExchange.Converters
         {
             // Check for exact match first, then if not found fallback to a case insensitive match 
             var mapping = Mapping.FirstOrDefault(kv => kv.Value.Equals(value, StringComparison.InvariantCulture));
-            if(mapping.Equals(default(KeyValuePair<T, string>)))
+            if (mapping.Equals(default(KeyValuePair<T, string>)))
                 mapping = Mapping.FirstOrDefault(kv => kv.Value.Equals(value, StringComparison.InvariantCultureIgnoreCase));
 
             if (!mapping.Equals(default(KeyValuePair<T, string>)))

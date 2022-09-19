@@ -37,7 +37,7 @@ namespace SharpCryptoExchange.Sockets
         /// Whether this is a user subscription or an internal listener
         /// </summary>
         public bool UserSubscription { get; set; }
-        
+
         /// <summary>
         /// If the subscription has been confirmed to be subscribed by the server
         /// </summary>

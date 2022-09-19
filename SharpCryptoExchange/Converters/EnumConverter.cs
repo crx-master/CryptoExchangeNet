@@ -1,5 +1,5 @@
-﻿using SharpCryptoExchange.Attributes;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
+using SharpCryptoExchange.Attributes;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -34,7 +34,7 @@ namespace SharpCryptoExchange.Converters
             {
                 // Received null value
                 var emptyResult = GetDefaultValue(objectType, enumType);
-                if(emptyResult != null)
+                if (emptyResult != null)
                     // If the property we're parsing to isn't nullable there isn't a correct way to return this as null will either throw an exception (.net framework) or the default enum value (dotnet core).
                     Trace.WriteLine($"{DateTime.Now:yyyy/MM/dd HH:mm:ss:fff} | Warning | Received null enum value, but property type is not a nullable enum. EnumType: {enumType.Name}. If you think {enumType.Name} should be nullable please open an issue on the Github repo");
 
@@ -67,18 +67,16 @@ namespace SharpCryptoExchange.Converters
             return Activator.CreateInstance(enumType); // return default value
         }
 
-        private static List<KeyValuePair<object, string>> AddMapping(Type objectType) 
+        private static List<KeyValuePair<object, string>> AddMapping(Type objectType)
         {
             var mapping = new List<KeyValuePair<object, string>>();
             var enumMembers = objectType.GetMembers();
             foreach (var member in enumMembers)
             {
-                var maps = member.GetCustomAttributes(typeof(MapAttribute), false);
-                foreach (MapAttribute attribute in maps)
-                {
-                    foreach (var value in attribute.Values)
-                        mapping.Add(new KeyValuePair<object, string>(Enum.Parse(objectType, member.Name), value));
-                }
+                var maps = member.GetCustomAttributes(typeof(MapAttribute), false).Select(ma => (MapAttribute)ma);
+                mapping.AddRange(from attribute in maps
+                                 from value in attribute.Values
+                                 select new KeyValuePair<object, string>(Enum.Parse(objectType, member.Name), value));
             }
             _mapping.TryAdd(objectType, mapping);
             return mapping;
@@ -125,7 +123,7 @@ namespace SharpCryptoExchange.Converters
             if (!_mapping.TryGetValue(objectType, out var mapping))
                 mapping = AddMapping(objectType);
 
-            return enumValue == null ? null : (mapping.FirstOrDefault(v => v.Key.Equals(enumValue)).Value ?? enumValue.ToString());            
+            return enumValue == null ? null : (mapping.FirstOrDefault(v => v.Key.Equals(enumValue)).Value ?? enumValue.ToString());
         }
 
         /// <inheritdoc />

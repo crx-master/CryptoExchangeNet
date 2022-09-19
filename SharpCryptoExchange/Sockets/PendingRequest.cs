@@ -1,5 +1,5 @@
-﻿using SharpCryptoExchange.Objects;
-using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json.Linq;
+using SharpCryptoExchange.Objects;
 using System;
 using System.Threading;
 
@@ -13,7 +13,7 @@ namespace SharpCryptoExchange.Sockets
         public AsyncResetEvent Event { get; }
         public TimeSpan Timeout { get; }
 
-        private CancellationTokenSource cts;
+        private readonly CancellationTokenSource _cts;
 
         public PendingRequest(Func<JToken, bool> handler, TimeSpan timeout)
         {
@@ -21,8 +21,8 @@ namespace SharpCryptoExchange.Sockets
             Event = new AsyncResetEvent(false, false);
             Timeout = timeout;
 
-            cts = new CancellationTokenSource(timeout);
-            cts.Token.Register(Fail, false);
+            _cts = new CancellationTokenSource(timeout);
+            _cts.Token.Register(Fail, false);
         }
 
         public bool CheckData(JToken data)

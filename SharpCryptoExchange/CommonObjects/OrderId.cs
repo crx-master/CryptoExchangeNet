@@ -1,13 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace SharpCryptoExchange.CommonObjects
+﻿namespace SharpCryptoExchange.CommonObjects
 {
     /// <summary>
     /// Id of an order
     /// </summary>
-    public class OrderId: BaseCommonObject
+    public class OrderId : BaseCommonObject
     {
         /// <summary>
         /// Id of an order

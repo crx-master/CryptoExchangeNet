@@ -1,15 +1,15 @@
-﻿using System;
+﻿using Newtonsoft.Json.Linq;
+using System;
 using System.IO;
 using System.Security;
 using System.Text;
-using Newtonsoft.Json.Linq;
 
 namespace SharpCryptoExchange.Authentication
 {
     /// <summary>
     /// Api credentials, used to sign requests accessing private endpoints
     /// </summary>
-    public class ApiCredentials: IDisposable
+    public class ApiCredentials : IDisposable
     {
         /// <summary>
         /// The api key to authenticate requests
@@ -85,10 +85,10 @@ namespace SharpCryptoExchange.Authentication
         public ApiCredentials(Stream inputStream, string? identifierKey = null, string? identifierSecret = null)
         {
             using var reader = new StreamReader(inputStream, Encoding.UTF8, false, 512, true);
-            
+
             var stringData = reader.ReadToEnd();
             var jsonData = stringData.ToJToken();
-            if(jsonData == null)
+            if (jsonData == null)
                 throw new ArgumentException("Input stream not valid json data");
 
             var key = TryGetValue(jsonData, identifierKey ?? "apiKey");
@@ -98,7 +98,7 @@ namespace SharpCryptoExchange.Authentication
                 throw new ArgumentException("apiKey or apiSecret value not found in Json credential file");
 
             Key = key.ToSecureString();
-            Secret = secret.ToSecureString();            
+            Secret = secret.ToSecureString();
 
             inputStream.Seek(0, SeekOrigin.Begin);
         }
@@ -113,8 +113,8 @@ namespace SharpCryptoExchange.Authentication
         {
             if (data[key] == null)
                 return null;
-            return (string) data[key]!;
-        }       
+            return (string)data[key]!;
+        }
 
         /// <summary>
         /// Dispose

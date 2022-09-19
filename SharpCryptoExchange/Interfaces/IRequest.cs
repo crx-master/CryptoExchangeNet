@@ -26,7 +26,7 @@ namespace SharpCryptoExchange.Interfaces
         /// <summary>
         /// Uri
         /// </summary>
-        Uri Uri { get; }
+        Uri? Uri { get; }
         /// <summary>
         /// internal request id for tracing
         /// </summary>

@@ -3,12 +3,12 @@
     /// <summary>
     /// Balance data
     /// </summary>
-    public class Balance: BaseCommonObject
+    public class Balance : BaseCommonObject
     {
         /// <summary>
         /// The asset name
         /// </summary>
-        public string Asset { get; set;  } = string.Empty;
+        public string Asset { get; set; } = string.Empty;
         /// <summary>
         /// Quantity available
         /// </summary>
@@ -16,6 +16,6 @@
         /// <summary>
         /// Total quantity
         /// </summary>
-        public decimal? Total { get; set;  }
+        public decimal? Total { get; set; }
     }
 }

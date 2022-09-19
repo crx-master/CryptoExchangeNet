@@ -1,4 +1,10 @@
-﻿using System;
+﻿using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Linq;
+using SharpCryptoExchange.Authentication;
+using SharpCryptoExchange.Interfaces;
+using SharpCryptoExchange.Objects;
+using SharpCryptoExchange.Sockets;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -6,19 +12,13 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using SharpCryptoExchange.Authentication;
-using SharpCryptoExchange.Interfaces;
-using SharpCryptoExchange.Objects;
-using SharpCryptoExchange.Sockets;
-using Microsoft.Extensions.Logging;
-using Newtonsoft.Json.Linq;
 
 namespace SharpCryptoExchange
 {
     /// <summary>
     /// Base for socket client implementations
     /// </summary>
-    public abstract class BaseSocketClient: BaseClient, ISocketClient
+    public abstract class BaseSocketClient : BaseClient, ISocketClient
     {
         #region fields
         /// <summary>
@@ -29,7 +29,8 @@ namespace SharpCryptoExchange
         /// <summary>
         /// List of socket connections currently connecting/connected
         /// </summary>
-        protected internal ConcurrentDictionary<int, SocketConnection> socketConnections = new();
+        protected internal ConcurrentDictionary<int, SocketConnection> SocketConnections { get; } = new();
+
         /// <summary>
         /// Semaphore used while creating sockets
         /// </summary>
@@ -84,24 +85,24 @@ namespace SharpCryptoExchange
         {
             get
             {
-                if (!socketConnections.Any())
+                if (!SocketConnections.Any())
                     return 0;
 
-                return socketConnections.Sum(s => s.Value.IncomingKbps);
+                return SocketConnections.Sum(s => s.Value.IncomingKbps);
             }
         }
 
         /// <inheritdoc />
-        public int CurrentConnections => socketConnections.Count;
+        public int CurrentConnections => SocketConnections.Count;
         /// <inheritdoc />
         public int CurrentSubscriptions
         {
             get
             {
-                if (!socketConnections.Any())
+                if (!SocketConnections.Any())
                     return 0;
 
-                return socketConnections.Sum(s => s.Value.SubscriptionCount);
+                return SocketConnections.Sum(s => s.Value.SubscriptionCount);
             }
         }
 
@@ -173,7 +174,7 @@ namespace SharpCryptoExchange
             if (disposing)
                 return new CallResult<UpdateSubscription>(new InvalidOperationError("Client disposed, can't subscribe"));
 
-            SocketConnection socketConnection;
+            SocketConnection? socketConnection = null;
             SocketSubscription? subscription;
             var released = false;
             // Wait for a semaphore here, so we only connect 1 socket at a time.
@@ -192,9 +193,9 @@ namespace SharpCryptoExchange
                 while (true)
                 {
                     // Get a new or existing socket connection
-                    var socketResult = await GetSocketConnection(apiClient, url, authenticated).ConfigureAwait(false);
-                    if(!socketResult)
-                        return socketResult.As<UpdateSubscription>(null);                    
+                    CallResult<SocketConnection> socketResult = await GetSocketConnection(apiClient, url, authenticated).ConfigureAwait(false);
+                    if (!socketResult)
+                        return socketResult.As<UpdateSubscription>(null);
 
                     socketConnection = socketResult.Data;
 
@@ -202,7 +203,7 @@ namespace SharpCryptoExchange
                     subscription = AddSubscription(request, identifier, true, socketConnection, dataHandler, authenticated);
                     if (subscription == null)
                     {
-                        log.Write(LogLevel.Trace, $"Socket {socketConnection.SocketId} failed to add subscription, retrying on different connection");
+                        Log.Write(LogLevel.Trace, $"Socket {socketConnection?.SocketId} failed to add subscription, retrying on different connection");
                         continue;
                     }
 
@@ -213,25 +214,27 @@ namespace SharpCryptoExchange
                         released = true;
                     }
 
-                    var needsConnecting = !socketConnection.Connected;
+                    var needsConnecting = socketConnection == null || !socketConnection.Connected;
 
                     var connectResult = await ConnectIfNeededAsync(socketConnection, authenticated).ConfigureAwait(false);
                     if (!connectResult)
-                        return new CallResult<UpdateSubscription>(connectResult.Error!);
+                        return new CallResult<UpdateSubscription>(connectResult?.Error);
 
                     break;
                 }
             }
             finally
             {
-                if(!released)
+                if (!released)
                     semaphoreSlim.Release();
             }
 
+            if (socketConnection == null) throw new ApplicationException($"null {nameof(socketConnection)}");
+
             if (socketConnection.PausedActivity)
             {
-                log.Write(LogLevel.Warning, $"Socket {socketConnection.SocketId} has been paused, can't subscribe at this moment");
-                return new CallResult<UpdateSubscription>( new ServerError("Socket is paused"));
+                Log.Write(LogLevel.Warning, $"Socket {socketConnection.SocketId} has been paused, can't subscribe at this moment");
+                return new CallResult<UpdateSubscription>(new ServerError("Socket is paused"));
             }
 
             if (request != null)
@@ -240,7 +243,7 @@ namespace SharpCryptoExchange
                 var subResult = await SubscribeAndWaitAsync(socketConnection, request, subscription).ConfigureAwait(false);
                 if (!subResult)
                 {
-                    log.Write(LogLevel.Warning, $"Socket {socketConnection.SocketId} failed to subscribe: {subResult.Error}");
+                    Log.Write(LogLevel.Warning, $"Socket {socketConnection.SocketId} failed to subscribe: {subResult.Error}");
                     await socketConnection.CloseAsync(subscription).ConfigureAwait(false);
                     return new CallResult<UpdateSubscription>(subResult.Error!);
                 }
@@ -255,12 +258,13 @@ namespace SharpCryptoExchange
             {
                 subscription.CancellationTokenRegistration = ct.Register(async () =>
                 {
-                    log.Write(LogLevel.Information, $"Socket {socketConnection.SocketId} Cancellation token set, closing subscription");
+                    Log.Write(LogLevel.Information, $"Socket {socketConnection.SocketId} Cancellation token set, closing subscription");
                     await socketConnection.CloseAsync(subscription).ConfigureAwait(false);
                 }, false);
             }
 
-            log.Write(LogLevel.Information, $"Socket {socketConnection.SocketId} subscription {subscription.Id} completed successfully");
+            Log.Write(LogLevel.Information, $"Socket {socketConnection.SocketId} subscription {subscription.Id} completed successfully");
+
             return new CallResult<UpdateSubscription>(new UpdateSubscription(socketConnection, subscription));
         }
 
@@ -282,7 +286,7 @@ namespace SharpCryptoExchange
                 return new CallResult<bool>(true);
             }
 
-            if(callResult== null)
+            if (callResult == null)
                 return new CallResult<bool>(new ServerError("No response on subscription request received"));
 
             return new CallResult<bool>(callResult.Error!);
@@ -315,7 +319,7 @@ namespace SharpCryptoExchange
             if (disposing)
                 return new CallResult<T>(new InvalidOperationError("Client disposed, can't query"));
 
-            SocketConnection socketConnection;
+            SocketConnection? socketConnection = null;
             var released = false;
             await semaphoreSlim.WaitAsync().ConfigureAwait(false);
             try
@@ -343,9 +347,9 @@ namespace SharpCryptoExchange
                     semaphoreSlim.Release();
             }
 
-            if (socketConnection.PausedActivity)
+            if (socketConnection != null && socketConnection.PausedActivity)
             {
-                log.Write(LogLevel.Warning, $"Socket {socketConnection.SocketId} has been paused, can't send query at this moment");
+                Log.Write(LogLevel.Warning, $"Socket {socketConnection.SocketId} has been paused, can't send query at this moment");
                 return new CallResult<T>(new ServerError("Socket is paused"));
             }
 
@@ -359,8 +363,11 @@ namespace SharpCryptoExchange
         /// <param name="socket">The connection to send and wait on</param>
         /// <param name="request">The request to send</param>
         /// <returns></returns>
-        protected virtual async Task<CallResult<T>> QueryAndWaitAsync<T>(SocketConnection socket, object request)
+        protected virtual async Task<CallResult<T>> QueryAndWaitAsync<T>(SocketConnection? socket, object? request)
         {
+            if (socket == null) throw new ArgumentNullException(nameof(socket));
+            if (request == null) throw new ArgumentNullException(nameof(request));
+
             var dataResult = new CallResult<T>(new ServerError("No response on query received"));
             await socket.SendAndWaitAsync(request, ClientOptions.SocketResponseTimeout, data =>
             {
@@ -380,8 +387,10 @@ namespace SharpCryptoExchange
         /// <param name="socket">The connection to check</param>
         /// <param name="authenticated">Whether the socket should authenticated</param>
         /// <returns></returns>
-        protected virtual async Task<CallResult<bool>> ConnectIfNeededAsync(SocketConnection socket, bool authenticated)
+        protected virtual async Task<CallResult<bool>> ConnectIfNeededAsync(SocketConnection? socket, bool authenticated)
         {
+            if (socket == null) throw new ArgumentNullException(nameof(socket));
+
             if (socket.Connected)
                 return new CallResult<bool>(true);
 
@@ -392,12 +401,12 @@ namespace SharpCryptoExchange
             if (!authenticated || socket.Authenticated)
                 return new CallResult<bool>(true);
 
-            log.Write(LogLevel.Debug, $"Attempting to authenticate {socket.SocketId}");
+            Log.Write(LogLevel.Debug, $"Attempting to authenticate {socket.SocketId}");
             var result = await AuthenticateSocketAsync(socket).ConfigureAwait(false);
             if (!result)
             {
-                log.Write(LogLevel.Warning, $"Socket {socket.SocketId} authentication failed");
-                if(socket.Connected)
+                Log.Write(LogLevel.Warning, $"Socket {socket.SocketId} authentication failed");
+                if (socket.Connected)
                     await socket.CloseAsync().ConfigureAwait(false);
 
                 result.Error!.Message = "Authentication failed: " + result.Error.Message;
@@ -421,7 +430,7 @@ namespace SharpCryptoExchange
         /// <param name="data">The message received from the server</param>
         /// <param name="callResult">The interpretation (null if message wasn't a response to the request)</param>
         /// <returns>True if the message was a response to the query</returns>
-        protected internal abstract bool HandleQueryResponse<T>(SocketConnection socketConnection, object request, JToken data, [NotNullWhen(true)]out CallResult<T>? callResult);
+        protected internal abstract bool HandleQueryResponse<T>(SocketConnection socketConnection, object request, JToken data, [NotNullWhen(true)] out CallResult<T>? callResult);
         /// <summary>
         /// The socketConnection received data (the data JToken parameter). The implementation of this method should check if the received data is a response to the subscription request that was send (the request parameter).
         /// For example; A subscribe request message is send with an Id parameter with value 10. The socket receives data and calls this method to see if the data it received is an
@@ -489,8 +498,10 @@ namespace SharpCryptoExchange
         /// <param name="dataHandler">The handler of the data received</param>
         /// <param name="authenticated">Whether the subscription needs authentication</param>
         /// <returns></returns>
-        protected virtual SocketSubscription? AddSubscription<T>(object? request, string? identifier, bool userSubscription, SocketConnection connection, Action<DataEvent<T>> dataHandler, bool authenticated)
+        protected virtual SocketSubscription? AddSubscription<T>(object? request, string? identifier, bool userSubscription, SocketConnection? connection, Action<DataEvent<T>> dataHandler, bool authenticated)
         {
+            if (connection == null) throw new ArgumentNullException(nameof(connection));
+
             void InternalHandler(MessageEvent messageEvent)
             {
                 if (typeof(T) == typeof(string))
@@ -503,7 +514,7 @@ namespace SharpCryptoExchange
                 var desResult = Deserialize<T>(messageEvent.JsonData);
                 if (!desResult)
                 {
-                    log.Write(LogLevel.Warning, $"Socket {connection.SocketId} Failed to deserialize data into type {typeof(T)}: {desResult.Error}");
+                    Log.Write(LogLevel.Warning, $"Socket {connection.SocketId} failed to deserialize data into type {typeof(T)}: {desResult.Error}");
                     return;
                 }
 
@@ -527,7 +538,7 @@ namespace SharpCryptoExchange
         {
             genericHandlers.Add(identifier, action);
             var subscription = SocketSubscription.CreateForIdentifier(NextId(), identifier, false, false, action);
-            foreach (var connection in socketConnections.Values)
+            foreach (var connection in SocketConnections.Values)
                 connection.AddSubscription(subscription);
         }
 
@@ -563,14 +574,14 @@ namespace SharpCryptoExchange
         /// <returns></returns>
         protected virtual async Task<CallResult<SocketConnection>> GetSocketConnection(SocketApiClient apiClient, string address, bool authenticated)
         {
-            var socketResult = socketConnections.Where(s => (s.Value.Status == SocketConnection.SocketStatus.None || s.Value.Status == SocketConnection.SocketStatus.Connected)
+            var socketResult = SocketConnections.Where(s => (s.Value.Status == SocketConnection.SocketStatus.None || s.Value.Status == SocketConnection.SocketStatus.Connected)
                                                   && s.Value.Tag.TrimEnd('/') == address.TrimEnd('/')
                                                   && (s.Value.ApiClient.GetType() == apiClient.GetType())
                                                   && (s.Value.Authenticated == authenticated || !authenticated) && s.Value.Connected).OrderBy(s => s.Value.SubscriptionCount).FirstOrDefault();
             var result = socketResult.Equals(default(KeyValuePair<int, SocketConnection>)) ? null : socketResult.Value;
             if (result != null)
             {
-                if (result.SubscriptionCount < ClientOptions.SocketSubscriptionsCombineTarget || (socketConnections.Count >= ClientOptions.MaxSocketConnections && socketConnections.All(s => s.Value.SubscriptionCount >= ClientOptions.SocketSubscriptionsCombineTarget)))
+                if (result.SubscriptionCount < ClientOptions.SocketSubscriptionsCombineTarget || (SocketConnections.Count >= ClientOptions.MaxSocketConnections && SocketConnections.All(s => s.Value.SubscriptionCount >= ClientOptions.SocketSubscriptionsCombineTarget)))
                 {
                     // Use existing socket if it has less than target connections OR it has the least connections and we can't make new
                     return new CallResult<SocketConnection>(result);
@@ -580,12 +591,12 @@ namespace SharpCryptoExchange
             var connectionAddress = await GetConnectionUrlAsync(apiClient, address, authenticated).ConfigureAwait(false);
             if (!connectionAddress)
             {
-                log.Write(LogLevel.Warning, $"Failed to determine connection url: " + connectionAddress.Error);
+                Log.Write(LogLevel.Warning, $"Failed to determine connection url: " + connectionAddress.Error);
                 return connectionAddress.As<SocketConnection>(null);
             }
 
             if (connectionAddress.Data != address)
-                log.Write(LogLevel.Debug, $"Connection address set to " + connectionAddress.Data);
+                Log.Write(LogLevel.Debug, $"Connection address set to " + connectionAddress.Data);
 
             // Create new socket
             var socket = CreateSocket(connectionAddress.Data!);
@@ -617,7 +628,7 @@ namespace SharpCryptoExchange
         {
             if (await socketConnection.ConnectAsync().ConfigureAwait(false))
             {
-                socketConnections.TryAdd(socketConnection.SocketId, socketConnection);
+                SocketConnections.TryAdd(socketConnection.SocketId, socketConnection);
                 return new CallResult<bool>(true);
             }
 
@@ -630,17 +641,17 @@ namespace SharpCryptoExchange
         /// </summary>
         /// <param name="address">The address to connect to</param>
         /// <returns></returns>
-        protected virtual WebSocketParameters GetWebSocketParameters(string address) 
-            => new (new Uri(address), ClientOptions.AutoReconnect)
-               {
-                   DataInterpreterBytes = dataInterpreterBytes,
-                   DataInterpreterString = dataInterpreterString,
-                   KeepAliveInterval = KeepAliveInterval,
-                   ReconnectInterval = ClientOptions.ReconnectInterval,
-                   RatelimitPerSecond = RateLimitPerSocketPerSecond,
-                   Proxy = ClientOptions.Proxy,
-                   Timeout = ClientOptions.SocketNoDataTimeout
-               };        
+        protected virtual WebSocketParameters GetWebSocketParameters(string address)
+            => new(new Uri(address), ClientOptions.AutoReconnect)
+            {
+                DataInterpreterBytes = dataInterpreterBytes,
+                DataInterpreterString = dataInterpreterString,
+                KeepAliveInterval = KeepAliveInterval,
+                ReconnectInterval = ClientOptions.ReconnectInterval,
+                RatelimitPerSecond = RateLimitPerSocketPerSecond,
+                Proxy = ClientOptions.Proxy,
+                Timeout = ClientOptions.SocketNoDataTimeout
+            };
 
         /// <summary>
         /// Create a socket for an address
@@ -649,8 +660,8 @@ namespace SharpCryptoExchange
         /// <returns></returns>
         protected virtual IWebsocket CreateSocket(string address)
         {
-            var socket = SocketFactory.CreateWebsocket(log, GetWebSocketParameters(address));
-            log.Write(LogLevel.Debug, $"Socket {socket.Id} new socket created for " + address);
+            var socket = SocketFactory.CreateWebsocket(Log, GetWebSocketParameters(address));
+            Log.Write(LogLevel.Debug, $"Socket {socket.Id} new socket created for " + address);
             return socket;
         }
 
@@ -673,8 +684,8 @@ namespace SharpCryptoExchange
                     await periodicEvent.WaitAsync(interval).ConfigureAwait(false);
                     if (disposing)
                         break;
-                    
-                    foreach (var socketConnection in socketConnections.Values)
+
+                    foreach (var socketConnection in SocketConnections.Values)
                     {
                         if (disposing)
                             break;
@@ -686,7 +697,7 @@ namespace SharpCryptoExchange
                         if (obj == null)
                             continue;
 
-                        log.Write(LogLevel.Trace, $"Socket {socketConnection.SocketId} sending periodic {identifier}");
+                        Log.Write(LogLevel.Trace, $"Socket {socketConnection.SocketId} sending periodic {identifier}");
 
                         try
                         {
@@ -694,7 +705,7 @@ namespace SharpCryptoExchange
                         }
                         catch (Exception ex)
                         {
-                            log.Write(LogLevel.Warning, $"Socket {socketConnection.SocketId} Periodic send {identifier} failed: " + ex.ToLogString());
+                            Log.Write(LogLevel.Warning, $"Socket {socketConnection.SocketId} Periodic send {identifier} failed: " + ex.ToLogString());
                         }
                     }
                 }
@@ -710,7 +721,7 @@ namespace SharpCryptoExchange
         {
             SocketSubscription? subscription = null;
             SocketConnection? connection = null;
-            foreach(var socket in socketConnections.Values.ToList())
+            foreach (var socket in SocketConnections.Values.ToList())
             {
                 subscription = socket.GetSubscription(subscriptionId);
                 if (subscription != null)
@@ -723,7 +734,7 @@ namespace SharpCryptoExchange
             if (subscription == null || connection == null)
                 return;
 
-            log.Write(LogLevel.Information, $"Socket {connection.SocketId} Unsubscribing subscription " + subscriptionId);
+            Log.Write(LogLevel.Information, $"Socket {connection.SocketId} Unsubscribing subscription " + subscriptionId);
             await connection.CloseAsync(subscription).ConfigureAwait(false);
         }
 
@@ -737,7 +748,7 @@ namespace SharpCryptoExchange
             if (subscription == null)
                 throw new ArgumentNullException(nameof(subscription));
 
-            log.Write(LogLevel.Information, $"Socket {subscription.SocketId} Unsubscribing subscription  " + subscription.Id);
+            Log.Write(LogLevel.Information, $"Socket {subscription.SocketId} Unsubscribing subscription  " + subscription.Id);
             await subscription.CloseAsync().ConfigureAwait(false);
         }
 
@@ -747,10 +758,10 @@ namespace SharpCryptoExchange
         /// <returns></returns>
         public virtual async Task UnsubscribeAllAsync()
         {
-            log.Write(LogLevel.Information, $"Unsubscribing all {socketConnections.Sum(s => s.Value.SubscriptionCount)} subscriptions");
+            Log.Write(LogLevel.Information, $"Unsubscribing all {SocketConnections.Sum(s => s.Value.SubscriptionCount)} subscriptions");
             var tasks = new List<Task>();
             {
-                var socketList = socketConnections.Values;
+                var socketList = SocketConnections.Values;
                 foreach (var sub in socketList)
                     tasks.Add(sub.CloseAsync());
             }
@@ -764,10 +775,10 @@ namespace SharpCryptoExchange
         /// <returns></returns>
         public virtual async Task ReconnectAsync()
         {
-            log.Write(LogLevel.Information, $"Reconnecting all {socketConnections.Count} connections");
+            Log.Write(LogLevel.Information, $"Reconnecting all {SocketConnections.Count} connections");
             var tasks = new List<Task>();
             {
-                var socketList = socketConnections.Values;
+                var socketList = SocketConnections.Values;
                 foreach (var sub in socketList)
                     tasks.Add(sub.TriggerReconnectAsync());
             }
@@ -781,8 +792,8 @@ namespace SharpCryptoExchange
         public string GetSubscriptionsState()
         {
             var sb = new StringBuilder();
-            sb.AppendLine($"{socketConnections.Count} connections, {CurrentSubscriptions} subscriptions, kbps: {IncomingKbps}");
-            foreach(var connection in socketConnections)
+            sb.AppendLine($"{SocketConnections.Count} connections, {CurrentSubscriptions} subscriptions, kbps: {IncomingKbps}");
+            foreach (var connection in SocketConnections)
             {
                 sb.AppendLine($"  Connection {connection.Key}: {connection.Value.SubscriptionCount} subscriptions, status: {connection.Value.Status}, authenticated: {connection.Value.Authenticated}, kbps: {connection.Value.IncomingKbps}");
                 foreach (var subscription in connection.Value.Subscriptions)
@@ -799,9 +810,9 @@ namespace SharpCryptoExchange
             disposing = true;
             periodicEvent?.Set();
             periodicEvent?.Dispose();
-            if (socketConnections.Sum(s => s.Value.SubscriptionCount) > 0)
+            if (SocketConnections.Sum(s => s.Value.SubscriptionCount) > 0)
             {
-                log.Write(LogLevel.Debug, "Disposing socket client, closing all subscriptions");
+                Log.Write(LogLevel.Debug, "Disposing socket client, closing all subscriptions");
                 _ = UnsubscribeAllAsync();
             }
             semaphoreSlim?.Dispose();

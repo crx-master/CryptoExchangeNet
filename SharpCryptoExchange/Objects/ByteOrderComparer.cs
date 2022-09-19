@@ -6,7 +6,7 @@ namespace SharpCryptoExchange.Objects
     /// <summary>
     /// Comparer for byte order
     /// </summary>
-    public class ByteOrderComparer : IComparer<byte[]>
+    public class ByteOrderComparer : IComparer<byte[]?>
     {
         /// <summary>
         /// Compare function
@@ -14,7 +14,7 @@ namespace SharpCryptoExchange.Objects
         /// <param name="x"></param>
         /// <param name="y"></param>
         /// <returns></returns>
-        public int Compare(byte[] x, byte[] y)
+        public int Compare(byte[]? x, byte[]? y)
         {
             // Shortcuts: If both are null, they are the same.
             if (x == null && y == null) return 0;

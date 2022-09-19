@@ -1,8 +1,4 @@
-﻿using SharpCryptoExchange.Objects;
-using SharpCryptoExchange.Sockets;
-using System;
-using System.Security.Authentication;
-using System.Text;
+﻿using System;
 using System.Threading.Tasks;
 
 namespace SharpCryptoExchange.Interfaces
@@ -10,7 +6,7 @@ namespace SharpCryptoExchange.Interfaces
     /// <summary>
     /// Webscoket connection interface
     /// </summary>
-    public interface IWebsocket: IDisposable
+    public interface IWebsocket : IDisposable
     {
         /// <summary>
         /// Websocket closed event

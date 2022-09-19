@@ -1,8 +1,8 @@
-﻿using System;
+﻿using SharpCryptoExchange.Objects;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using SharpCryptoExchange.Objects;
 
 namespace SharpCryptoExchange.Interfaces
 {

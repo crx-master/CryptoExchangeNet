@@ -1,5 +1,4 @@
 ﻿using SharpCryptoExchange.CommonObjects;
-using SharpCryptoExchange.Interfaces.CommonClients;
 using SharpCryptoExchange.Objects;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,7 +8,7 @@ namespace SharpCryptoExchange.Interfaces.CommonClients
     /// <summary>
     /// Common spot endpoints
     /// </summary>
-    public interface ISpotClient: IBaseRestClient
+    public interface ISpotClient : IBaseRestClient
     {
         /// <summary>
         /// Place an order

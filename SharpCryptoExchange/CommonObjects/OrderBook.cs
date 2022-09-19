@@ -1,13 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace SharpCryptoExchange.CommonObjects
 {
     /// <summary>
     /// Order book data
     /// </summary>
-    public class OrderBook: BaseCommonObject
+    public class OrderBook : BaseCommonObject
     {
         /// <summary>
         /// List of bids

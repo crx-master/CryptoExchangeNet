@@ -88,7 +88,7 @@ namespace SharpCryptoExchange.Sockets
             this.connection = connection;
             this.subscription = subscription;
         }
-        
+
         /// <summary>
         /// Close the subscription
         /// </summary>

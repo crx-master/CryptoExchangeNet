@@ -5,7 +5,7 @@ namespace SharpCryptoExchange.CommonObjects
     /// <summary>
     /// Trade data
     /// </summary>
-    public class Trade: BaseCommonObject
+    public class Trade : BaseCommonObject
     {
         /// <summary>
         /// Symbol of the trade
@@ -28,7 +28,7 @@ namespace SharpCryptoExchange.CommonObjects
     /// <summary>
     /// User trade info
     /// </summary>
-    public class UserTrade: Trade
+    public class UserTrade : Trade
     {
         /// <summary>
         /// Id of the trade

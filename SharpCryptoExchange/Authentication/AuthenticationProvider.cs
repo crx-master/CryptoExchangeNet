@@ -83,7 +83,7 @@ namespace SharpCryptoExchange.Authentication
         {
             using var encryptor = SHA256.Create();
             var resultBytes = encryptor.ComputeHash(Encoding.UTF8.GetBytes(data));
-            return outputType == SignOutputType.Base64 ? BytesToBase64String(resultBytes): BytesToHexString(resultBytes);
+            return outputType == SignOutputType.Base64 ? BytesToBase64String(resultBytes) : BytesToHexString(resultBytes);
         }
 
         /// <summary>

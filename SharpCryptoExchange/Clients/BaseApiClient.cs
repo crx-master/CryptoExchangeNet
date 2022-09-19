@@ -1,15 +1,15 @@
+using SharpCryptoExchange.Authentication;
+using SharpCryptoExchange.Objects;
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
-using SharpCryptoExchange.Authentication;
-using SharpCryptoExchange.Objects;
 
 namespace SharpCryptoExchange
 {
     /// <summary>
     /// Base API for all API clients
     /// </summary>
-    public abstract class BaseApiClient: IDisposable
+    public abstract class BaseApiClient : IDisposable
     {
         private ApiCredentials? _apiCredentials;
         private AuthenticationProvider? _authenticationProvider;
@@ -21,7 +21,7 @@ namespace SharpCryptoExchange
         /// </summary>
         public AuthenticationProvider? AuthenticationProvider
         {
-            get 
+            get
             {
                 if (!_created && !_disposing && _apiCredentials != null)
                 {
@@ -109,6 +109,7 @@ namespace SharpCryptoExchange
             _disposing = true;
             _apiCredentials?.Dispose();
             AuthenticationProvider?.Credentials?.Dispose();
+            GC.SuppressFinalize(this);
         }
     }
 }

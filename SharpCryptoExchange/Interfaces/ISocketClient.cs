@@ -1,15 +1,15 @@
-﻿using System;
-using System.Threading.Tasks;
-using SharpCryptoExchange.Authentication;
+﻿using SharpCryptoExchange.Authentication;
 using SharpCryptoExchange.Objects;
 using SharpCryptoExchange.Sockets;
+using System;
+using System.Threading.Tasks;
 
 namespace SharpCryptoExchange.Interfaces
 {
     /// <summary>
     /// Base class for socket API implementations
     /// </summary>
-    public interface ISocketClient: IDisposable
+    public interface ISocketClient : IDisposable
     {
         /// <summary>
         /// The options provided for this client
@@ -31,7 +31,7 @@ namespace SharpCryptoExchange.Interfaces
         /// The current amount of connections to the API from this client. A connection can have multiple subscriptions.
         /// </summary>
         public int CurrentConnections { get; }
-        
+
         /// <summary>
         /// The current amount of subscriptions running from the client
         /// </summary>

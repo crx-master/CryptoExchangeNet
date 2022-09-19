@@ -9,7 +9,7 @@ namespace SharpCryptoExchange.Converters
     /// <summary>
     /// Datetime converter. Supports converting from string/long/double to DateTime and back. Numbers are assumed to be the time since 1970-01-01.
     /// </summary>
-    public class DateTimeConverter: JsonConverter
+    public class DateTimeConverter : JsonConverter
     {
         private static readonly DateTime _epoch = new(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         private const long ticksPerSecond = TimeSpan.TicksPerMillisecond * 1000;
@@ -28,18 +28,18 @@ namespace SharpCryptoExchange.Converters
             if (reader.Value == null)
                 return null;
 
-            if(reader.TokenType is JsonToken.Integer)
+            if (reader.TokenType is JsonToken.Integer)
             {
                 var longValue = (long)reader.Value;
                 if (longValue == 0 || longValue == -1)
-                    return objectType == typeof(DateTime) ? default(DateTime): null;
+                    return objectType == typeof(DateTime) ? default(DateTime) : null;
                 if (longValue < 19999999999)
                     return ConvertFromSeconds(longValue);
                 if (longValue < 19999999999999)
                     return ConvertFromMilliseconds(longValue);
                 if (longValue < 19999999999999999)
                     return ConvertFromMicroseconds(longValue);
-                
+
                 return ConvertFromNanoseconds(longValue);
             }
             else if (reader.TokenType is JsonToken.Float)
@@ -50,10 +50,10 @@ namespace SharpCryptoExchange.Converters
 
                 if (doubleValue < 19999999999)
                     return ConvertFromSeconds(doubleValue);
-                
+
                 return ConvertFromMilliseconds(doubleValue);
             }
-            else if(reader.TokenType is JsonToken.String)
+            else if (reader.TokenType is JsonToken.String)
             {
                 var stringValue = (string)reader.Value;
                 if (string.IsNullOrWhiteSpace(stringValue))
@@ -65,9 +65,9 @@ namespace SharpCryptoExchange.Converters
                 if (stringValue.Length == 8)
                 {
                     // Parse 20211103 format
-                    if (!int.TryParse(stringValue.Substring(0, 4), out var year)
-                        || !int.TryParse(stringValue.Substring(4, 2), out var month)
-                        || !int.TryParse(stringValue.Substring(6, 2), out var day))
+                    if (!int.TryParse(stringValue[..4], out var year)
+                        || !int.TryParse(stringValue.AsSpan(4, 2), out var month)
+                        || !int.TryParse(stringValue.AsSpan(6, 2), out var day))
                     {
                         Trace.WriteLine($"{DateTime.Now:yyyy/MM/dd HH:mm:ss:fff} | Warning | Unknown DateTime format: " + reader.Value);
                         return default;
@@ -78,9 +78,9 @@ namespace SharpCryptoExchange.Converters
                 if (stringValue.Length == 6)
                 {
                     // Parse 211103 format
-                    if (!int.TryParse(stringValue.Substring(0, 2), out var year)
-                        || !int.TryParse(stringValue.Substring(2, 2), out var month)
-                        || !int.TryParse(stringValue.Substring(4, 2), out var day))
+                    if (!int.TryParse(stringValue[..2], out var year)
+                        || !int.TryParse(stringValue.AsSpan(2, 2), out var month)
+                        || !int.TryParse(stringValue.AsSpan(4, 2), out var day))
                     {
                         Trace.WriteLine("{DateTime.Now:yyyy/MM/dd HH:mm:ss:fff} | Warning | Unknown DateTime format: " + reader.Value);
                         return default;
@@ -101,11 +101,11 @@ namespace SharpCryptoExchange.Converters
                     return ConvertFromNanoseconds((long)doubleValue);
                 }
 
-                if(stringValue.Length == 10)
+                if (stringValue.Length == 10)
                 {
                     // Parse 2021-11-03 format
                     var values = stringValue.Split('-');
-                    if(!int.TryParse(values[0], out var year)
+                    if (!int.TryParse(values[0], out var year)
                         || !int.TryParse(values[1], out var month)
                         || !int.TryParse(values[2], out var day))
                     {
@@ -118,7 +118,7 @@ namespace SharpCryptoExchange.Converters
 
                 return DateTime.Parse(stringValue, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal);
             }
-            else if(reader.TokenType == JsonToken.Date)
+            else if (reader.TokenType == JsonToken.Date)
             {
                 return (DateTime)reader.Value;
             }
@@ -159,7 +159,7 @@ namespace SharpCryptoExchange.Converters
         /// <param name="time"></param>
         /// <returns></returns>
         [return: NotNullIfNotNull("time")]
-        public static long? ConvertToSeconds(DateTime? time) => time == null ? null: (long)Math.Round((time.Value - _epoch).TotalSeconds);
+        public static long? ConvertToSeconds(DateTime? time) => time == null ? null : (long)Math.Round((time.Value - _epoch).TotalSeconds);
         /// <summary>
         /// Convert a DateTime value to milliseconds since epoch (01-01-1970) value
         /// </summary>
@@ -189,7 +189,7 @@ namespace SharpCryptoExchange.Converters
             var datetimeValue = (DateTime?)value;
             if (datetimeValue == null)
                 writer.WriteValue((DateTime?)null);
-            if(datetimeValue == default(DateTime))
+            if (datetimeValue == default(DateTime))
                 writer.WriteValue((DateTime?)null);
             else
                 writer.WriteValue((long)Math.Round(((DateTime)value! - new DateTime(1970, 1, 1)).TotalMilliseconds));

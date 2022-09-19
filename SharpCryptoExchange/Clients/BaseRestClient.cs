@@ -1,3 +1,10 @@
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using SharpCryptoExchange.Authentication;
+using SharpCryptoExchange.Interfaces;
+using SharpCryptoExchange.Objects;
+using SharpCryptoExchange.Requests;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -7,13 +14,6 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using SharpCryptoExchange.Authentication;
-using SharpCryptoExchange.Interfaces;
-using SharpCryptoExchange.Objects;
-using SharpCryptoExchange.Requests;
-using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace SharpCryptoExchange
 {
@@ -26,7 +26,7 @@ namespace SharpCryptoExchange
         /// The factory for creating requests. Used for unit testing
         /// </summary>
         public IRequestFactory RequestFactory { get; set; } = new RequestFactory();
-        
+
         /// <inheritdoc />
         public int TotalRequestsMade => ApiClients.OfType<RestApiClient>().Sum(s => s.TotalRequestsMade);
 
@@ -47,10 +47,7 @@ namespace SharpCryptoExchange
         /// <param name="options">The options for this client</param>
         protected BaseRestClient(string name, BaseRestClientOptions options) : base(name, options)
         {
-            if (options == null)
-                throw new ArgumentNullException(nameof(options));
-
-            ClientOptions = options;
+            ClientOptions = options ?? throw new ArgumentNullException(nameof(options));
             RequestFactory.Configure(options.RequestTimeout, options.Proxy, options.HttpClient);
         }
 
@@ -119,13 +116,13 @@ namespace SharpCryptoExchange
         [return: NotNull]
         protected virtual async Task<WebCallResult<T>> SendRequestAsync<T>(
             RestApiClient apiClient,
-            Uri uri, 
-            HttpMethod method, 
-            CancellationToken cancellationToken,            
-            Dictionary<string, object>? parameters = null, 
-            bool signed = false, 
+            Uri uri,
+            HttpMethod method,
+            CancellationToken cancellationToken,
+            Dictionary<string, object>? parameters = null,
+            bool signed = false,
             HttpMethodParameterPosition? parameterPosition = null,
-            ArrayParametersSerialization? arraySerialization = null, 
+            ArrayParametersSerialization? arraySerialization = null,
             int requestWeight = 1,
             JsonSerializer? deserializer = null,
             Dictionary<string, string>? additionalHeaders = null,
@@ -180,7 +177,7 @@ namespace SharpCryptoExchange
                     var syncTimeResult = await syncTask.ConfigureAwait(false);
                     if (!syncTimeResult)
                     {
-                        log.Write(LogLevel.Debug, $"[{requestId}] Failed to sync time, aborting request: " + syncTimeResult.Error);
+                        Log.Write(LogLevel.Debug, $"[{requestId}] Failed to sync time, aborting request: " + syncTimeResult.Error);
                         return syncTimeResult.As<IRequest>(default);
                     }
                 }
@@ -190,7 +187,7 @@ namespace SharpCryptoExchange
             {
                 foreach (var limiter in apiClient.RateLimiters)
                 {
-                    var limitResult = await limiter.LimitRequestAsync(log, uri.AbsolutePath, method, signed, apiClient.Options.ApiCredentials?.Key, apiClient.Options.RateLimitingBehaviour, requestWeight, cancellationToken).ConfigureAwait(false);
+                    var limitResult = await limiter.LimitRequestAsync(Log, uri.AbsolutePath, method, signed, apiClient.Options.ApiCredentials?.Key, apiClient.Options.RateLimitingBehaviour, requestWeight, cancellationToken).ConfigureAwait(false);
                     if (!limitResult.Success)
                         return new CallResult<IRequest>(limitResult.Error!);
                 }
@@ -198,11 +195,11 @@ namespace SharpCryptoExchange
 
             if (signed && apiClient.AuthenticationProvider == null)
             {
-                log.Write(LogLevel.Warning, $"[{requestId}] Request {uri.AbsolutePath} failed because no ApiCredentials were provided");
+                Log.Write(LogLevel.Warning, $"[{requestId}] Request {uri.AbsolutePath} failed because no ApiCredentials were provided");
                 return new CallResult<IRequest>(new NoApiCredentialsError());
             }
 
-            log.Write(LogLevel.Information, $"[{requestId}] Creating request for " + uri);
+            Log.Write(LogLevel.Information, $"[{requestId}] Creating request for " + uri);
             var paramsPosition = parameterPosition ?? apiClient.ParameterPositions[method];
             var request = ConstructRequest(apiClient, uri, method, parameters, signed, paramsPosition, arraySerialization ?? apiClient.arraySerialization, requestId, additionalHeaders);
 
@@ -215,7 +212,7 @@ namespace SharpCryptoExchange
                 paramString += " with headers " + string.Join(", ", headers.Select(h => h.Key + $"=[{string.Join(",", h.Value)}]"));
 
             apiClient.TotalRequestsMade++;
-            log.Write(LogLevel.Trace, $"[{requestId}] Sending {method}{(signed ? " signed" : "")} request to {request.Uri}{paramString ?? " "}{(ClientOptions.Proxy == null ? "" : $" via proxy {ClientOptions.Proxy.Host}")}");
+            Log.Write(LogLevel.Trace, $"[{requestId}] Sending {method}{(signed ? " signed" : "")} request to {request.Uri}{paramString ?? " "}{(ClientOptions.Proxy == null ? "" : $" via proxy {ClientOptions.Proxy.Host}")}");
             return new CallResult<IRequest>(request);
         }
 
@@ -231,12 +228,13 @@ namespace SharpCryptoExchange
         /// <param name="expectedEmptyResponse">If an empty response is expected</param>
         /// <returns></returns>
         protected virtual async Task<WebCallResult<T>> GetResponseAsync<T>(
-            BaseApiClient apiClient, 
-            IRequest request, 
-            JsonSerializer? deserializer, 
+            BaseApiClient apiClient,
+            IRequest? request,
+            JsonSerializer? deserializer,
             CancellationToken cancellationToken,
             bool expectedEmptyResponse)
         {
+            if (request == null) throw new ArgumentNullException(nameof(request));
             try
             {
                 var sw = Stopwatch.StartNew();
@@ -255,41 +253,62 @@ namespace SharpCryptoExchange
                         var data = await reader.ReadToEndAsync().ConfigureAwait(false);
                         responseStream.Close();
                         response.Close();
-                        log.Write(LogLevel.Debug, $"[{request.RequestId}] Response received in {sw.ElapsedMilliseconds}ms{(log.Level == LogLevel.Trace ? (": "+data): "")}");
+                        Log.Write(LogLevel.Debug, $"[{request.RequestId}] Response received in {sw.ElapsedMilliseconds}ms{(Log.Level == LogLevel.Trace ? (": " + data) : "")}");
+
+                        string uriString = request.Uri != null ? $"{request.Uri}" : string.Empty;
 
                         if (!expectedEmptyResponse)
                         {
                             // Validate if it is valid json. Sometimes other data will be returned, 502 error html pages for example
                             var parseResult = ValidateJson(data);
-                            if (!parseResult.Success)
-                                return new WebCallResult<T>(response.StatusCode, response.ResponseHeaders, sw.Elapsed, ClientOptions.OutputOriginalData ? data : null, request.Uri.ToString(), request.Content, request.Method, request.GetHeaders(), default, parseResult.Error!);
+                            if (parseResult == null || !parseResult.Success || parseResult.Data == null)
+                                return new WebCallResult<T>(
+                                    response.StatusCode, response.ResponseHeaders, sw.Elapsed,
+                                    ClientOptions.OutputOriginalData ? data : null, uriString, request.Content,
+                                    request.Method, request.GetHeaders(), default, parseResult?.Error);
 
                             // Let the library implementation see if it is an error response, and if so parse the error
                             var error = await TryParseErrorAsync(parseResult.Data).ConfigureAwait(false);
                             if (error != null)
-                                return new WebCallResult<T>(response.StatusCode, response.ResponseHeaders, sw.Elapsed, ClientOptions.OutputOriginalData ? data : null, request.Uri.ToString(), request.Content, request.Method, request.GetHeaders(), default, error!);
+                                return new WebCallResult<T>(
+                                    response.StatusCode, response.ResponseHeaders, sw.Elapsed,
+                                    ClientOptions.OutputOriginalData ? data : null, uriString, request.Content,
+                                    request.Method, request.GetHeaders(), default, error!);
 
                             // Not an error, so continue deserializing
                             var deserializeResult = Deserialize<T>(parseResult.Data, deserializer, request.RequestId);
-                            return new WebCallResult<T>(response.StatusCode, response.ResponseHeaders, sw.Elapsed, ClientOptions.OutputOriginalData ? data : null, request.Uri.ToString(), request.Content, request.Method, request.GetHeaders(), deserializeResult.Data, deserializeResult.Error);
+                            return new WebCallResult<T>(
+                                response.StatusCode, response.ResponseHeaders, sw.Elapsed,
+                                ClientOptions.OutputOriginalData ? data : null, uriString, request.Content,
+                                request.Method, request.GetHeaders(), deserializeResult.Data, deserializeResult.Error);
                         }
                         else
                         {
                             if (!string.IsNullOrEmpty(data))
                             {
                                 var parseResult = ValidateJson(data);
-                                if (!parseResult.Success)
+                                if (parseResult == null || !parseResult.Success || parseResult.Data == null)
                                     // Not empty, and not json
-                                    return new WebCallResult<T>(response.StatusCode, response.ResponseHeaders, sw.Elapsed, ClientOptions.OutputOriginalData ? data : null, request.Uri.ToString(), request.Content, request.Method, request.GetHeaders(), default, parseResult.Error!);
+                                    return new WebCallResult<T>(
+                                        response.StatusCode, response.ResponseHeaders, sw.Elapsed,
+                                        ClientOptions.OutputOriginalData ? data : null, uriString,
+                                        request.Content, request.Method, request.GetHeaders(), default,
+                                        parseResult?.Error!);
 
                                 var error = await TryParseErrorAsync(parseResult.Data).ConfigureAwait(false);
                                 if (error != null)
                                     // Error response
-                                    return new WebCallResult<T>(response.StatusCode, response.ResponseHeaders, sw.Elapsed, ClientOptions.OutputOriginalData ? data : null, request.Uri.ToString(), request.Content, request.Method, request.GetHeaders(), default, error!);
+                                    return new WebCallResult<T>(
+                                        response.StatusCode, response.ResponseHeaders, sw.Elapsed,
+                                        ClientOptions.OutputOriginalData ? data : null, uriString,
+                                        request.Content, request.Method, request.GetHeaders(), default, error!);
                             }
 
                             // Empty success response; okay
-                            return new WebCallResult<T>(response.StatusCode, response.ResponseHeaders, sw.Elapsed, ClientOptions.OutputOriginalData ? data : null, request.Uri.ToString(), request.Content, request.Method, request.GetHeaders(), default, default);
+                            return new WebCallResult<T>(
+                                response.StatusCode, response.ResponseHeaders, sw.Elapsed,
+                                ClientOptions.OutputOriginalData ? data : null, uriString, request.Content,
+                                request.Method, request.GetHeaders(), default, default);
                         }
                     }
                     else
@@ -300,7 +319,7 @@ namespace SharpCryptoExchange
                             responseStream.Close();
                             response.Close();
 
-                            return new WebCallResult<T>(statusCode, headers, sw.Elapsed, null, request.Uri.ToString(), request.Content, request.Method, request.GetHeaders(), default, null);
+                            return new WebCallResult<T>(statusCode, headers, sw.Elapsed, null, $"{request.Uri}", request.Content, request.Method, request.GetHeaders(), default, null);
                         }
 
                         // Success status code, and we don't have to check for errors. Continue deserializing directly from the stream
@@ -308,7 +327,7 @@ namespace SharpCryptoExchange
                         responseStream.Close();
                         response.Close();
 
-                        return new WebCallResult<T>(statusCode, headers, sw.Elapsed, ClientOptions.OutputOriginalData ? desResult.OriginalData : null, request.Uri.ToString(), request.Content, request.Method, request.GetHeaders(), desResult.Data, desResult.Error);
+                        return new WebCallResult<T>(statusCode, headers, sw.Elapsed, ClientOptions.OutputOriginalData ? desResult.OriginalData : null, $"{request.Uri}", request.Content, request.Method, request.GetHeaders(), desResult.Data, desResult.Error);
                     }
                 }
                 else
@@ -316,36 +335,36 @@ namespace SharpCryptoExchange
                     // Http status code indicates error
                     using var reader = new StreamReader(responseStream);
                     var data = await reader.ReadToEndAsync().ConfigureAwait(false);
-                    log.Write(LogLevel.Warning, $"[{request.RequestId}] Error received in {sw.ElapsedMilliseconds}ms: {data}");
+                    Log.Write(LogLevel.Warning, $"[{request.RequestId}] Error received in {sw.ElapsedMilliseconds}ms: {data}");
                     responseStream.Close();
                     response.Close();
                     var parseResult = ValidateJson(data);
                     var error = parseResult.Success ? ParseErrorResponse(parseResult.Data) : new ServerError(data)!;
-                    if(error.Code == null || error.Code == 0)
+                    if (error.Code == null || error.Code == 0)
                         error.Code = (int)response.StatusCode;
-                    return new WebCallResult<T>(statusCode, headers, sw.Elapsed, data, request.Uri.ToString(), request.Content, request.Method, request.GetHeaders(), default, error);
+                    return new WebCallResult<T>(statusCode, headers, sw.Elapsed, data, $"{request.Uri}", request.Content, request.Method, request.GetHeaders(), default, error);
                 }
             }
             catch (HttpRequestException requestException)
             {
                 // Request exception, can't reach server for instance
                 var exceptionInfo = requestException.ToLogString();
-                log.Write(LogLevel.Warning, $"[{request.RequestId}] Request exception: " + exceptionInfo);
-                return new WebCallResult<T>(null, null, null, null, request.Uri.ToString(), request.Content, request.Method, request.GetHeaders(), default, new WebError(exceptionInfo));
+                Log.Write(LogLevel.Warning, $"[{request.RequestId}] Request exception: " + exceptionInfo);
+                return new WebCallResult<T>(null, null, null, null, $"{request.Uri}", request.Content, request.Method, request.GetHeaders(), default, new WebError(exceptionInfo));
             }
             catch (OperationCanceledException canceledException)
             {
                 if (cancellationToken != default && canceledException.CancellationToken == cancellationToken)
                 {
                     // Cancellation token canceled by caller
-                    log.Write(LogLevel.Warning, $"[{request.RequestId}] Request canceled by cancellation token");
-                    return new WebCallResult<T>(null, null, null, null, request.Uri.ToString(), request.Content, request.Method, request.GetHeaders(), default, new CancellationRequestedError());
+                    Log.Write(LogLevel.Warning, $"[{request.RequestId}] Request canceled by cancellation token");
+                    return new WebCallResult<T>(null, null, null, null, $"{request.Uri}", request.Content, request.Method, request.GetHeaders(), default, new CancellationRequestedError());
                 }
                 else
                 {
                     // Request timed out
-                    log.Write(LogLevel.Warning, $"[{request.RequestId}] Request timed out: " + canceledException.ToLogString());
-                    return new WebCallResult<T>(null, null, null, null, request.Uri.ToString(), request.Content, request.Method, request.GetHeaders(), default, new WebError($"[{request.RequestId}] Request timed out"));
+                    Log.Write(LogLevel.Warning, $"[{request.RequestId}] Request timed out: " + canceledException.ToLogString());
+                    return new WebCallResult<T>(null, null, null, null, $"{request.Uri}", request.Content, request.Method, request.GetHeaders(), default, new WebError($"[{request.RequestId}] Request timed out"));
                 }
             }
         }
@@ -386,9 +405,9 @@ namespace SharpCryptoExchange
             int requestId,
             Dictionary<string, string>? additionalHeaders)
         {
-            parameters ??= new Dictionary<string, object>();
+            parameters ??= new();
 
-            for (var i = 0; i< parameters.Count; i++)
+            for (var i = 0; i < parameters.Count; i++)
             {
                 var kvp = parameters.ElementAt(i);
                 if (kvp.Value is Func<object> delegateValue)
@@ -398,7 +417,9 @@ namespace SharpCryptoExchange
             if (parameterPosition == HttpMethodParameterPosition.InUri)
             {
                 foreach (var parameter in parameters)
-                    uri = uri.AddQueryParmeter(parameter.Key, parameter.Value.ToString());
+                {
+                    uri = uri.AddQueryParmeter(parameter.Key, parameter.Value.ToString() ?? "");
+                }
             }
 
             var headers = new Dictionary<string, string>();
@@ -406,19 +427,19 @@ namespace SharpCryptoExchange
             var bodyParameters = parameterPosition == HttpMethodParameterPosition.InBody ? new SortedDictionary<string, object>(parameters) : new SortedDictionary<string, object>();
             if (apiClient.AuthenticationProvider != null)
                 apiClient.AuthenticationProvider.AuthenticateRequest(
-                    apiClient, 
-                    uri, 
-                    method, 
-                    parameters, 
-                    signed, 
+                    apiClient,
+                    uri,
+                    method,
+                    parameters,
+                    signed,
                     arraySerialization,
                     parameterPosition,
-                    out uriParameters, 
-                    out bodyParameters, 
+                    out uriParameters,
+                    out bodyParameters,
                     out headers);
-                 
+
             // Sanity check
-            foreach(var param in parameters)
+            foreach (var param in parameters)
             {
                 if (!uriParameters.ContainsKey(param.Key) && !bodyParameters.ContainsKey(param.Key))
                     throw new Exception($"Missing parameter {param.Key} after authentication processing. AuthenticationProvider implementation " +
@@ -427,7 +448,7 @@ namespace SharpCryptoExchange
 
             // Add the auth parameters to the uri, start with a new URI to be able to sort the parameters including the auth parameters            
             uri = uri.SetParameters(uriParameters, arraySerialization);
-        
+
             var request = RequestFactory.Create(method, uri, requestId);
             request.Accept = Constants.JsonContentHeader;
 
@@ -488,9 +509,9 @@ namespace SharpCryptoExchange
         /// </summary>
         /// <param name="error">The string the request returned</param>
         /// <returns></returns>
-        protected virtual Error ParseErrorResponse(JToken error)
+        protected virtual Error ParseErrorResponse(JToken? error)
         {
-            return new ServerError(error.ToString());
+            return new ServerError($"{error}");
         }
     }
 }

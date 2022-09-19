@@ -1,7 +1,7 @@
-﻿using System;
-using System.Threading;
+﻿using Microsoft.Extensions.Logging;
 using SharpCryptoExchange.Logging;
-using Microsoft.Extensions.Logging;
+using System;
+using System.Threading;
 
 namespace SharpCryptoExchange.Objects
 {

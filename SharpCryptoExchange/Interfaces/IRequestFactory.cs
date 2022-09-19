@@ -24,6 +24,6 @@ namespace SharpCryptoExchange.Interfaces
         /// <param name="requestTimeout">Request timeout to use</param>
         /// <param name="proxy">Proxy settings to use</param>       
         /// <param name="httpClient">Optional shared http client instance</param>
-        void Configure(TimeSpan requestTimeout, ApiProxy? proxy, HttpClient? httpClient=null);
+        void Configure(TimeSpan requestTimeout, ApiProxy? proxy, HttpClient? httpClient = null);
     }
 }

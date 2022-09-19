@@ -1,15 +1,15 @@
-﻿using SharpCryptoExchange.Interfaces;
+﻿using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using SharpCryptoExchange.Interfaces;
+using SharpCryptoExchange.Logging;
+using SharpCryptoExchange.Objects;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Threading.Tasks;
-using SharpCryptoExchange.Logging;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using Microsoft.Extensions.Logging;
-using SharpCryptoExchange.Objects;
 using System.Net.WebSockets;
+using System.Threading.Tasks;
 
 namespace SharpCryptoExchange.Sockets
 {
@@ -53,8 +53,11 @@ namespace SharpCryptoExchange.Sockets
         /// </summary>
         public int SubscriptionCount
         {
-            get { lock (subscriptionLock)
-                return subscriptions.Count(h => h.UserSubscription); }
+            get
+            {
+                lock (subscriptionLock)
+                    return subscriptions.Count(h => h.UserSubscription);
+            }
         }
 
         /// <summary>
@@ -121,7 +124,7 @@ namespace SharpCryptoExchange.Sockets
                 {
                     pausedActivity = value;
                     log.Write(LogLevel.Information, $"Socket {SocketId} Paused activity: " + value);
-                    if(pausedActivity) _ = Task.Run(() => ActivityPaused?.Invoke());
+                    if (pausedActivity) _ = Task.Run(() => ActivityPaused?.Invoke());
                     else _ = Task.Run(() => ActivityUnpaused?.Invoke());
                 }
             }
@@ -169,7 +172,7 @@ namespace SharpCryptoExchange.Sockets
         /// <param name="tag"></param>
         public SocketConnection(BaseSocketClient client, SocketApiClient apiClient, IWebsocket socket, string tag)
         {
-            log = client.log;
+            log = client.Log;
             socketClient = client;
             ApiClient = apiClient;
             Tag = tag;
@@ -203,11 +206,11 @@ namespace SharpCryptoExchange.Sockets
         {
             Status = SocketStatus.Closed;
             Authenticated = false;
-            lock(subscriptionLock)
+            lock (subscriptionLock)
             {
                 foreach (var sub in subscriptions)
                     sub.Confirmed = false;
-            }    
+            }
             Task.Run(() => ConnectionClosed?.Invoke());
         }
 
@@ -368,8 +371,8 @@ namespace SharpCryptoExchange.Sockets
             if (Status == SocketStatus.Closed || Status == SocketStatus.Disposed)
                 return;
 
-            if (socketClient.socketConnections.ContainsKey(SocketId))
-                socketClient.socketConnections.TryRemove(SocketId, out _);
+            if (socketClient.SocketConnections.ContainsKey(SocketId))
+                socketClient.SocketConnections.TryRemove(SocketId, out _);
 
             lock (subscriptionLock)
             {
@@ -454,7 +457,7 @@ namespace SharpCryptoExchange.Sockets
                     return false;
 
                 subscriptions.Add(subscription);
-                if(subscription.UserSubscription)
+                if (subscription.UserSubscription)
                     log.Write(LogLevel.Debug, $"Socket {SocketId} adding new subscription with id {subscription.Id}, total subscriptions on connection: {subscriptions.Count(s => s.UserSubscription)}");
                 return true;
             }
@@ -477,7 +480,7 @@ namespace SharpCryptoExchange.Sockets
         /// <returns></returns>
         public SocketSubscription? GetSubscriptionByRequest(Func<object?, bool> predicate)
         {
-            lock(subscriptionLock)
+            lock (subscriptionLock)
                 return subscriptions.SingleOrDefault(s => predicate(s.Request));
         }
 
@@ -490,7 +493,7 @@ namespace SharpCryptoExchange.Sockets
         {
             SocketSubscription? currentSubscription = null;
             try
-            { 
+            {
                 var handled = false;
                 TimeSpan userCodeDuration = TimeSpan.Zero;
 
@@ -526,7 +529,7 @@ namespace SharpCryptoExchange.Sockets
                         }
                     }
                 }
-                               
+
                 return (handled, userCodeDuration, currentSubscription);
             }
             catch (Exception ex)
@@ -553,8 +556,8 @@ namespace SharpCryptoExchange.Sockets
                 pendingRequests.Add(pending);
             }
             var sendOk = Send(obj);
-            if(!sendOk)            
-                pending.Fail();            
+            if (!sendOk)
+                pending.Fail();
 
             return pending.Event.WaitAsync(timeout);
         }
@@ -567,7 +570,7 @@ namespace SharpCryptoExchange.Sockets
         /// <param name="nullValueHandling">How null values should be serialized</param>
         public virtual bool Send<T>(T obj, NullValueHandling nullValueHandling = NullValueHandling.Ignore)
         {
-            if(obj is string str)
+            if (obj is string str)
                 return Send(str);
             else
                 return Send(JsonConvert.SerializeObject(obj, Formatting.None, new JsonSerializerSettings { NullValueHandling = nullValueHandling }));
@@ -585,7 +588,7 @@ namespace SharpCryptoExchange.Sockets
                 _socket.Send(data);
                 return true;
             }
-            catch(Exception)
+            catch (Exception)
             {
                 return false;
             }
@@ -623,7 +626,7 @@ namespace SharpCryptoExchange.Sockets
             }
 
             // Get a list of all subscriptions on the socket
-            List<SocketSubscription> subscriptionList = new List<SocketSubscription>();
+            List<SocketSubscription> subscriptionList = new();
             lock (subscriptionLock)
             {
                 foreach (var subscription in subscriptions)
@@ -641,7 +644,7 @@ namespace SharpCryptoExchange.Sockets
                 if (!_socket.IsOpen)
                     return new CallResult<bool>(new WebError("Socket not connected"));
 
-                var taskList = new List<Task<CallResult<bool>>>();
+                List<Task<CallResult<bool>>> taskList = new();
                 foreach (var subscription in subscriptionList.Skip(i).Take(socketClient.ClientOptions.MaxConcurrentResubscriptionsPerSocket))
                     taskList.Add(socketClient.SubscribeAndWaitAsync(this, subscription.Request!, subscription));
 

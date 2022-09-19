@@ -1,12 +1,13 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using SharpCryptoExchange.Attributes;
+using System;
 using System.Collections;
 using System.Collections.Concurrent;
+using System.Data;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
-using SharpCryptoExchange.Attributes;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace SharpCryptoExchange.Converters
 {
@@ -16,22 +17,22 @@ namespace SharpCryptoExchange.Converters
     /// </summary>
     public class ArrayConverter : JsonConverter
     {
-        private static readonly ConcurrentDictionary<(MemberInfo, Type), Attribute> attributeByMemberInfoAndTypeCache = new ConcurrentDictionary<(MemberInfo, Type), Attribute>();
-        private static readonly ConcurrentDictionary<(Type, Type), Attribute> attributeByTypeAndTypeCache = new ConcurrentDictionary<(Type, Type), Attribute>();
+        private static readonly ConcurrentDictionary<(MemberInfo, Type), Attribute?> _attributeByMemberInfoAndTypeCache = new();
+        private static readonly ConcurrentDictionary<(Type, Type), Attribute?> _attributeByTypeAndTypeCache = new();
 
         /// <inheritdoc />
         public override bool CanConvert(Type objectType)
         {
             return true;
         }
-        
+
         /// <inheritdoc />
         public override object? ReadJson(JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer)
         {
             if (objectType == typeof(JToken))
                 return JToken.Load(reader);
 
-            var result = Activator.CreateInstance(objectType);
+            var result = Activator.CreateInstance(objectType) ?? throw new ApplicationException($"Activator failed for {objectType}");
             var arr = JArray.Load(reader);
             return ParseObject(arr, result, objectType);
         }
@@ -55,15 +56,17 @@ namespace SharpCryptoExchange.Converters
                     var count = 0;
                     if (innerArray.Count == 0)
                     {
-                        var arrayResult = (IList)Activator.CreateInstance(property.PropertyType, new [] { 0 });
+                        var arrayResult = (IList?)Activator.CreateInstance(property.PropertyType, new[] { 0 });
                         property.SetValue(result, arrayResult);
                     }
                     else if (innerArray[0].Type == JTokenType.Array)
                     {
-                        var arrayResult = (IList)Activator.CreateInstance(property.PropertyType, new [] { innerArray.Count });
+                        IList arrayResult = (IList?)Activator.CreateInstance(property.PropertyType, new[] { innerArray.Count }) 
+                            ?? throw new ApplicationException($"Activator failed creating instance of {property.PropertyType}[{innerArray.Count}]");
                         foreach (var obj in innerArray)
                         {
-                            var innerObj = Activator.CreateInstance(objType!);
+                            var innerObj = Activator.CreateInstance(objType!)
+                                ?? throw new ApplicationException($"Activator failed creating instance of {objType}");
                             arrayResult[count] = ParseObject((JArray)obj, innerObj, objType!);
                             count++;
                         }
@@ -71,8 +74,10 @@ namespace SharpCryptoExchange.Converters
                     }
                     else
                     {
-                        var arrayResult = (IList)Activator.CreateInstance(property.PropertyType, new [] { 1 });
-                        var innerObj = Activator.CreateInstance(objType!);
+                        var arrayResult = (IList?)Activator.CreateInstance(property.PropertyType, new[] { 1 })
+                                ?? throw new ApplicationException($"Activator failed creating instance of {property.PropertyType}[1]");
+                        var innerObj = Activator.CreateInstance(objType!)
+                                ?? throw new ApplicationException($"Activator failed creating instance of {objType}");
                         arrayResult[0] = ParseObject(innerArray, innerObj, objType!);
                         property.SetValue(result, arrayResult);
                     }
@@ -85,7 +90,15 @@ namespace SharpCryptoExchange.Converters
                 object? value;
                 if (converterAttribute != null)
                 {
-                    value = arr[attribute.Index].ToObject(property.PropertyType, new JsonSerializer {Converters = {(JsonConverter) Activator.CreateInstance(converterAttribute.ConverterType)}});
+                    value = arr[attribute.Index]
+                        .ToObject(
+                            property.PropertyType,
+                            new JsonSerializer { 
+                                Converters = {
+                                    (JsonConverter?)Activator.CreateInstance(converterAttribute.ConverterType)
+                                        ?? throw new ApplicationException($"Activator failed creating instance of {converterAttribute.ConverterType}")
+                            }
+                        });
                 }
                 else if (conversionAttribute != null)
                 {
@@ -106,7 +119,7 @@ namespace SharpCryptoExchange.Converters
 
                     if ((property.PropertyType == typeof(decimal)
                      || property.PropertyType == typeof(decimal?))
-                     && (value != null && value.ToString().Contains("e")))
+                     && (value != null && value.ToString() != null && value.ToString()!.Contains('e')))
                     {
                         if (decimal.TryParse(value.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var dec))
                             property.SetValue(result, dec);
@@ -149,7 +162,10 @@ namespace SharpCryptoExchange.Converters
                 last = arrayProp.Index;
                 var converterAttribute = GetCustomAttribute<JsonConverterAttribute>(prop);
                 if (converterAttribute != null)
-                    writer.WriteRawValue(JsonConvert.SerializeObject(prop.GetValue(value), (JsonConverter)Activator.CreateInstance(converterAttribute.ConverterType)));
+                    writer.WriteRawValue(JsonConvert.SerializeObject(prop.GetValue(value), 
+                        (JsonConverter?)Activator.CreateInstance(converterAttribute.ConverterType)
+                            ?? throw new ApplicationException($"Activator failed on create non null instance of {converterAttribute.ConverterType}")
+                        ));
                 else if (!IsSimple(prop.PropertyType))
                     serializer.Serialize(writer, prop.GetValue(value));
                 else
@@ -171,18 +187,34 @@ namespace SharpCryptoExchange.Converters
               || type == typeof(decimal);
         }
 
-        private static T? GetCustomAttribute<T>(MemberInfo memberInfo) where T : Attribute =>
-            (T?)attributeByMemberInfoAndTypeCache.GetOrAdd((memberInfo, typeof(T)), tuple => memberInfo.GetCustomAttribute(typeof(T)));
+        private static AttributeType? GetCustomAttribute<AttributeType>(MemberInfo memberInfo) 
+            where AttributeType : Attribute
+        {
+            return (AttributeType?)_attributeByMemberInfoAndTypeCache.GetOrAdd(
+                (memberInfo, typeof(AttributeType)),
+                (tuple) =>
+                {
+                    return memberInfo.GetCustomAttribute(typeof(AttributeType));
+                });
+        }
 
-        private static T? GetCustomAttribute<T>(Type type) where T : Attribute =>
-            (T?)attributeByTypeAndTypeCache.GetOrAdd((type, typeof(T)), tuple => type.GetCustomAttribute(typeof(T)));
+        private static AttributeType? GetCustomAttribute<AttributeType>(Type type)
+            where AttributeType : Attribute
+        {
+            return (AttributeType?)_attributeByTypeAndTypeCache.GetOrAdd(
+                (type, typeof(AttributeType)),
+                (tuple) =>
+                {
+                    return type.GetCustomAttribute(typeof(AttributeType));
+                });
+        }
     }
 
     /// <summary>
     /// Mark property as an index in the array
     /// </summary>
     [AttributeUsage(AttributeTargets.Property)]
-    public class ArrayPropertyAttribute: Attribute
+    public class ArrayPropertyAttribute : Attribute
     {
         /// <summary>
         /// The index in the array

@@ -23,27 +23,27 @@ namespace SharpCryptoExchange.Sockets
         /// <summary>
         /// The received data deserialized into an object
         /// </summary>
-        public T Data { get; set; }
+        public T? Data { get; set; }
 
         /// <summary>
         /// Ctor
         /// </summary>
         /// <param name="data"></param>
         /// <param name="timestamp"></param>
-        public DataEvent(T data, DateTime timestamp)
+        public DataEvent(T? data, DateTime timestamp)
         {
             Data = data;
             Timestamp = timestamp;
         }
 
-        internal DataEvent(T data, string? topic, DateTime timestamp)
+        internal DataEvent(T? data, string? topic, DateTime timestamp)
         {
             Data = data;
             Topic = topic;
             Timestamp = timestamp;
         }
 
-        internal DataEvent(T data, string? topic, string? originalData, DateTime timestamp)
+        internal DataEvent(T? data, string? topic, string? originalData, DateTime timestamp)
         {
             Data = data;
             Topic = topic;

@@ -3,7 +3,7 @@
     /// <summary>
     /// Symbol data
     /// </summary>
-    public class Symbol: BaseCommonObject
+    public class Symbol : BaseCommonObject
     {
         /// <summary>
         /// Name of the symbol
@@ -16,18 +16,18 @@
         /// <summary>
         /// Step with which the quantity should increase
         /// </summary>
-        public decimal? QuantityStep { get; set; } 
+        public decimal? QuantityStep { get; set; }
         /// <summary>
         /// step with which the price should increase
         /// </summary>
-        public decimal? PriceStep { get; set; } 
+        public decimal? PriceStep { get; set; }
         /// <summary>
         /// The max amount of decimals for quantity
         /// </summary>
-        public int? QuantityDecimals { get; set; } 
+        public int? QuantityDecimals { get; set; }
         /// <summary>
         /// The max amount of decimal for price
         /// </summary>
-        public int? PriceDecimals { get; set; } 
+        public int? PriceDecimals { get; set; }
     }
 }

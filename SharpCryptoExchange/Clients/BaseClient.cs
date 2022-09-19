@@ -1,13 +1,13 @@
-﻿using SharpCryptoExchange.Authentication;
-using SharpCryptoExchange.Logging;
-using SharpCryptoExchange.Objects;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using SharpCryptoExchange.Logging;
+using SharpCryptoExchange.Objects;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -29,15 +29,15 @@ namespace SharpCryptoExchange
         /// <summary>
         /// The log object
         /// </summary>
-        protected internal Log log;
+        protected internal Log Log;
         /// <summary>
         /// The last used id, use NextId() to get the next id and up this
         /// </summary>
-        protected static int lastId;
+        private static int LastId;
         /// <summary>
         /// Lock for id generating
         /// </summary>
-        protected static object idLock = new object();
+        private static readonly object _idLock = new();
 
         /// <summary>
         /// A default serializer
@@ -60,25 +60,25 @@ namespace SharpCryptoExchange
         /// <param name="options">The options for this client</param>
         protected BaseClient(string name, BaseClientOptions options)
         {
-            log = new Log(name);
-            log.UpdateWriters(options.LogWriters);
-            log.Level = options.LogLevel;
+            Log = new Log(name);
+            Log.UpdateWriters(options.LogWriters);
+            Log.Level = options.LogLevel;
             options.OnLoggingChanged += HandleLogConfigChange;
 
             ClientOptions = options;
 
             Name = name;
 
-            log.Write(LogLevel.Trace, $"Client configuration: {options}, SharpCryptoExchange: v{typeof(BaseClient).Assembly.GetName().Version}, {name}.Net: v{GetType().Assembly.GetName().Version}");
+            Log.Write(LogLevel.Trace, $"Client configuration: {options}, SharpCryptoExchange: v{typeof(BaseClient).Assembly.GetName().Version}, {name}.Net: v{GetType().Assembly.GetName().Version}");
         }
 
         /// <summary>
         /// Register an API client
         /// </summary>
         /// <param name="apiClient">The client</param>
-        protected T AddApiClient<T>(T apiClient) where T:  BaseApiClient
+        protected T AddApiClient<T>(T apiClient) where T : BaseApiClient
         {
-            log.Write(LogLevel.Trace, $"  {apiClient.GetType().Name} configuration: {apiClient.Options}");
+            Log.Write(LogLevel.Trace, $"  {apiClient.GetType().Name} configuration: {apiClient.Options}");
             ApiClients.Add(apiClient);
             return apiClient;
         }
@@ -93,7 +93,7 @@ namespace SharpCryptoExchange
             if (string.IsNullOrEmpty(data))
             {
                 var info = "Empty data object received";
-                log.Write(LogLevel.Error, info);
+                Log.Write(LogLevel.Error, info);
                 return new CallResult<JToken>(new DeserializeError(info, data));
             }
 
@@ -106,16 +106,9 @@ namespace SharpCryptoExchange
                 var info = $"Deserialize JsonReaderException: {jre.Message}, Path: {jre.Path}, LineNumber: {jre.LineNumber}, LinePosition: {jre.LinePosition}";
                 return new CallResult<JToken>(new DeserializeError(info, data));
             }
-            catch (JsonSerializationException jse)
-            {
-                var info = $"Deserialize JsonSerializationException: {jse.Message}";
-                return new CallResult<JToken>(new DeserializeError(info, data));
-            }
             catch (Exception ex)
             {
-                var exceptionInfo = ex.ToLogString();
-                var info = $"Deserialize Unknown Exception: {exceptionInfo}";
-                return new CallResult<JToken>(new DeserializeError(info, data));
+                return new CallResult<JToken>(new DeserializeError($"Deserialize {ex.GetType()}: {ex.ToLogString()}", data));
             }
         }
 
@@ -132,23 +125,25 @@ namespace SharpCryptoExchange
             var tokenResult = ValidateJson(data);
             if (!tokenResult)
             {
-                log.Write(LogLevel.Error, tokenResult.Error!.Message);
-                return new CallResult<T>( tokenResult.Error);
+                Log.Write(LogLevel.Error, tokenResult.Error!.Message);
+                return new CallResult<T>(tokenResult.Error);
             }
 
             return Deserialize<T>(tokenResult.Data, serializer, requestId);
         }
 
         /// <summary>
-        /// Deserialize a JToken into an object
+        /// Deserialize a JToken into a CallResult
         /// </summary>
-        /// <typeparam name="T">The type to deserialize into</typeparam>
+        /// <typeparam name="T">The type of Data to deserialize into</typeparam>
         /// <param name="obj">The data to deserialize</param>
         /// <param name="serializer">A specific serializer to use</param>
         /// <param name="requestId">Id of the request the data is returned from (used for grouping logging by request)</param>
         /// <returns></returns>
-        protected CallResult<T> Deserialize<T>(JToken obj, JsonSerializer? serializer = null, int? requestId = null)
+        protected CallResult<T> Deserialize<T>(JToken? obj, JsonSerializer? serializer = null, int? requestId = null)
         {
+            if (obj == null) throw new SerializationException($"null JToken cannot be deserialized into {typeof(T)} type");
+
             serializer ??= defaultSerializer;
 
             try
@@ -158,20 +153,20 @@ namespace SharpCryptoExchange
             catch (JsonReaderException jre)
             {
                 var info = $"{(requestId != null ? $"[{requestId}] " : "")}Deserialize JsonReaderException: {jre.Message} Path: {jre.Path}, LineNumber: {jre.LineNumber}, LinePosition: {jre.LinePosition}, data: {obj}";
-                log.Write(LogLevel.Error, info);
+                Log.Write(LogLevel.Error, info);
                 return new CallResult<T>(new DeserializeError(info, obj));
             }
             catch (JsonSerializationException jse)
             {
                 var info = $"{(requestId != null ? $"[{requestId}] " : "")}Deserialize JsonSerializationException: {jse.Message} data: {obj}";
-                log.Write(LogLevel.Error, info);
+                Log.Write(LogLevel.Error, info);
                 return new CallResult<T>(new DeserializeError(info, obj));
             }
             catch (Exception ex)
             {
                 var exceptionInfo = ex.ToLogString();
                 var info = $"{(requestId != null ? $"[{requestId}] " : "")}Deserialize Unknown Exception: {exceptionInfo}, data: {obj}";
-                log.Write(LogLevel.Error, info);
+                Log.Write(LogLevel.Error, info);
                 return new CallResult<T>(new DeserializeError(info, obj));
             }
         }
@@ -197,20 +192,20 @@ namespace SharpCryptoExchange
 
                 // If we have to output the original json data or output the data into the logging we'll have to read to full response
                 // in order to log/return the json data
-                if (ClientOptions.OutputOriginalData || log.Level == LogLevel.Trace)
+                if (ClientOptions.OutputOriginalData || Log.Level == LogLevel.Trace)
                 {
                     data = await reader.ReadToEndAsync().ConfigureAwait(false);
-                    log.Write(LogLevel.Debug, $"{(requestId != null ? $"[{requestId}] ": "")}Response received{(elapsedMilliseconds != null ? $" in {elapsedMilliseconds}" : " ")}ms{(log.Level == LogLevel.Trace ? (": " + data) : "")}");
+                    Log.Write(LogLevel.Debug, $"{(requestId != null ? $"[{requestId}] " : "")}Response received{(elapsedMilliseconds != null ? $" in {elapsedMilliseconds}" : " ")}ms{(Log.Level == LogLevel.Trace ? (": " + data) : "")}");
                     var result = Deserialize<T>(data, serializer, requestId);
-                    if(ClientOptions.OutputOriginalData)
+                    if (ClientOptions.OutputOriginalData)
                         result.OriginalData = data;
                     return result;
                 }
-                
+
                 // If we don't have to keep track of the original json data we can use the JsonTextReader to deserialize the stream directly
                 // into the desired object, which has increased performance over first reading the string value into memory and deserializing from that
                 using var jsonReader = new JsonTextReader(reader);
-                log.Write(LogLevel.Debug, $"{(requestId != null ? $"[{requestId}] ": "")}Response received{(elapsedMilliseconds != null ? $" in {elapsedMilliseconds}" : " ")}ms");
+                Log.Write(LogLevel.Debug, $"{(requestId != null ? $"[{requestId}] " : "")}Response received{(elapsedMilliseconds != null ? $" in {elapsedMilliseconds}" : " ")}ms");
                 return new CallResult<T>(serializer.Deserialize<T>(jsonReader)!);
             }
             catch (JsonReaderException jre)
@@ -226,7 +221,7 @@ namespace SharpCryptoExchange
                     else
                         data = "[Data only available in Trace LogLevel]";
                 }
-                log.Write(LogLevel.Error, $"{(requestId != null ? $"[{requestId}] " : "")}Deserialize JsonReaderException: {jre.Message}, Path: {jre.Path}, LineNumber: {jre.LineNumber}, LinePosition: {jre.LinePosition}, data: {data}");
+                Log.Write(LogLevel.Error, $"{(requestId != null ? $"[{requestId}] " : "")}Deserialize JsonReaderException: {jre.Message}, Path: {jre.Path}, LineNumber: {jre.LineNumber}, LinePosition: {jre.LinePosition}, data: {data}");
                 return new CallResult<T>(new DeserializeError($"Deserialize JsonReaderException: {jre.Message}, Path: {jre.Path}, LineNumber: {jre.LineNumber}, LinePosition: {jre.LinePosition}", data));
             }
             catch (JsonSerializationException jse)
@@ -242,7 +237,7 @@ namespace SharpCryptoExchange
                         data = "[Data only available in Trace LogLevel]";
                 }
 
-                log.Write(LogLevel.Error, $"{(requestId != null ? $"[{requestId}] " : "")}Deserialize JsonSerializationException: {jse.Message}, data: {data}");
+                Log.Write(LogLevel.Error, $"{(requestId != null ? $"[{requestId}] " : "")}Deserialize JsonSerializationException: {jse.Message}, data: {data}");
                 return new CallResult<T>(new DeserializeError($"Deserialize JsonSerializationException: {jse.Message}", data));
             }
             catch (Exception ex)
@@ -259,13 +254,13 @@ namespace SharpCryptoExchange
                 }
 
                 var exceptionInfo = ex.ToLogString();
-                log.Write(LogLevel.Error, $"{(requestId != null ? $"[{requestId}] " : "")}Deserialize Unknown Exception: {exceptionInfo}, data: {data}");
+                Log.Write(LogLevel.Error, $"{(requestId != null ? $"[{requestId}] " : "")}Deserialize Unknown Exception: {exceptionInfo}, data: {data}");
                 return new CallResult<T>(new DeserializeError($"Deserialize Unknown Exception: {exceptionInfo}", data));
             }
         }
 
         private static async Task<string> ReadStreamAsync(Stream stream)
-        { 
+        {
             using var reader = new StreamReader(stream, Encoding.UTF8, false, 512, true);
             return await reader.ReadToEndAsync().ConfigureAwait(false);
         }
@@ -276,11 +271,11 @@ namespace SharpCryptoExchange
         /// <returns></returns>
         protected static int NextId()
         {
-            lock (idLock)
+            lock (_idLock)
             {
-                lastId += 1;
-                return lastId;
+                LastId++;
             }
+            return LastId;
         }
 
         /// <summary>
@@ -288,8 +283,8 @@ namespace SharpCryptoExchange
         /// </summary>
         private void HandleLogConfigChange()
         {
-            log.UpdateWriters(ClientOptions.LogWriters);
-            log.Level = ClientOptions.LogLevel;
+            Log.UpdateWriters(ClientOptions.LogWriters);
+            Log.Level = ClientOptions.LogLevel;
         }
 
         /// <summary>
@@ -297,10 +292,12 @@ namespace SharpCryptoExchange
         /// </summary>
         public virtual void Dispose()
         {
-            log.Write(LogLevel.Debug, "Disposing client");
+            Log.Write(LogLevel.Debug, "Disposing client");
             ClientOptions.OnLoggingChanged -= HandleLogConfigChange;
             foreach (var client in ApiClients)
                 client.Dispose();
+
+            GC.SuppressFinalize(this);
         }
     }
 }

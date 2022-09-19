@@ -68,7 +68,7 @@
     /// <summary>
     /// Error returned by the server
     /// </summary>
-    public class ServerError: Error
+    public class ServerError : Error
     {
         /// <summary>
         /// ctor
@@ -150,7 +150,7 @@
     /// <summary>
     /// Rate limit exceeded
     /// </summary>
-    public class RateLimitError: Error
+    public class RateLimitError : Error
     {
         /// <summary>
         /// ctor
@@ -173,7 +173,7 @@
     /// <summary>
     /// Invalid operation requested
     /// </summary>
-    public class InvalidOperationError: Error
+    public class InvalidOperationError : Error
     {
         /// <summary>
         /// ctor

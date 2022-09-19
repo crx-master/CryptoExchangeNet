@@ -1,11 +1,9 @@
-﻿using System;
-
-namespace SharpCryptoExchange.CommonObjects
+﻿namespace SharpCryptoExchange.CommonObjects
 {
     /// <summary>
     /// Ticker data
     /// </summary>
-    public class Ticker: BaseCommonObject
+    public class Ticker : BaseCommonObject
     {
         /// <summary>
         /// Symbol

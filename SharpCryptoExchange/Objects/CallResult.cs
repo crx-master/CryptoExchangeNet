@@ -44,12 +44,12 @@ namespace SharpCryptoExchange.Objects
     /// The result of an operation
     /// </summary>
     /// <typeparam name="T"></typeparam>
-    public class CallResult<T>: CallResult
+    public class CallResult<T> : CallResult
     {
         /// <summary>
         /// The data returned by the call, only available when Success = true
         /// </summary>
-        public T Data { get; internal set; }
+        public T? Data { get; internal set; }
 
         /// <summary>
         /// The original data returned by the call, only available when `OutputOriginalData` is set to `true` in the client options
@@ -62,14 +62,13 @@ namespace SharpCryptoExchange.Objects
         /// <param name="data"></param>
         /// <param name="originalData"></param>
         /// <param name="error"></param>
-#pragma warning disable 8618
-        protected CallResult([AllowNull]T data, string? originalData, Error? error): base(error)
-#pragma warning restore 8618
+        protected CallResult(
+            T? data,
+            string? originalData,
+            Error? error) : base(error)
         {
             OriginalData = originalData;
-#pragma warning disable 8601
             Data = data;
-#pragma warning restore 8601
         }
 
         /// <summary>
@@ -82,7 +81,7 @@ namespace SharpCryptoExchange.Objects
         /// Create a new error result
         /// </summary>
         /// <param name="error">The erro rto return</param>
-        public CallResult(Error error) : this(default, null, error) { }
+        public CallResult(Error? error) : this(default, null, error) { }
 
         /// <summary>
         /// Overwrite bool check so we can use if(callResult) instead of if(callResult.Success)
@@ -215,7 +214,7 @@ namespace SharpCryptoExchange.Objects
         /// ctor
         /// </summary>
         /// <param name="error"></param>
-        public WebCallResult(Error error): base(error) { }
+        public WebCallResult(Error error) : base(error) { }
 
         /// <summary>
         /// Return the result as an error result
@@ -232,7 +231,7 @@ namespace SharpCryptoExchange.Objects
     /// The result of a request
     /// </summary>
     /// <typeparam name="T"></typeparam>
-    public class WebCallResult<T>: CallResult<T>
+    public class WebCallResult<T> : CallResult<T>
     {
         /// <summary>
         /// The request http method

@@ -1,25 +1,22 @@
+using SharpCryptoExchange.Interfaces;
+using SharpCryptoExchange.Objects;
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using System.Threading.Tasks;
-using SharpCryptoExchange.Interfaces;
-using SharpCryptoExchange.Logging;
-using SharpCryptoExchange.Objects;
-using Microsoft.Extensions.Logging;
 
 namespace SharpCryptoExchange
 {
     /// <summary>
     /// Base rest API client for interacting with a REST API
     /// </summary>
-    public abstract class RestApiClient: BaseApiClient
+    public abstract class RestApiClient : BaseApiClient
     {
         /// <summary>
         /// Get time sync info for an API client
         /// </summary>
         /// <returns></returns>
         public abstract TimeSyncInfo GetTimeSyncInfo();
-        
+
         /// <summary>
         /// Get time offset for an API client
         /// </summary>
@@ -46,7 +43,7 @@ namespace SharpCryptoExchange
         /// </summary>
         /// <param name="options">The base client options</param>
         /// <param name="apiOptions">The Api client options</param>
-        public RestApiClient(BaseRestClientOptions options, RestApiClientOptions apiOptions): base(options, apiOptions)
+        public RestApiClient(BaseRestClientOptions options, RestApiClientOptions apiOptions) : base(options, apiOptions)
         {
             var rateLimiters = new List<IRateLimiter>();
             foreach (var rateLimiter in apiOptions.RateLimiters)
@@ -94,7 +91,7 @@ namespace SharpCryptoExchange
                 // Calculate time offset between local and server
                 var offset = result.Data - (localTime.AddMilliseconds(result.ResponseTime!.Value.TotalMilliseconds / 2));
                 timeSyncParams.UpdateTimeOffset(offset);
-                timeSyncParams.TimeSyncState.Semaphore.Release();                
+                timeSyncParams.TimeSyncState.Semaphore.Release();
             }
 
             return new WebCallResult<bool>(null, null, null, null, null, null, null, null, true, null);

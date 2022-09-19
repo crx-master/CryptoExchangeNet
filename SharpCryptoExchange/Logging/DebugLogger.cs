@@ -7,7 +7,7 @@ namespace SharpCryptoExchange.Logging
     /// <summary>
     /// Default log writer, uses Trace.WriteLine
     /// </summary>
-    public class DebugLogger: ILogger
+    public class DebugLogger : ILogger
     {
         /// <inheritdoc />
         public IDisposable BeginScope<TState>(TState state) => null!;

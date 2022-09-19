@@ -5,6 +5,7 @@ namespace SharpCryptoExchange.Attributes
     /// <summary>
     /// Map a enum entry to string values
     /// </summary>
+    [AttributeUsage(AttributeTargets.All)]
     public class MapAttribute : Attribute
     {
         /// <summary>

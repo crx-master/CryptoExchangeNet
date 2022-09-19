@@ -1,8 +1,8 @@
-﻿using System;
+﻿using SharpCryptoExchange.Interfaces;
+using SharpCryptoExchange.Objects;
+using System;
 using System.Net;
 using System.Net.Http;
-using SharpCryptoExchange.Interfaces;
-using SharpCryptoExchange.Objects;
 
 namespace SharpCryptoExchange.Requests
 {
@@ -11,7 +11,7 @@ namespace SharpCryptoExchange.Requests
     /// </summary>
     public class RequestFactory : IRequestFactory
     {
-        private HttpClient? httpClient;        
+        private HttpClient? httpClient;
 
         /// <inheritdoc />
         public void Configure(TimeSpan requestTimeout, ApiProxy? proxy, HttpClient? client = null)
@@ -31,7 +31,7 @@ namespace SharpCryptoExchange.Requests
             }
             else
             {
-                httpClient = client;                
+                httpClient = client;
             }
         }
 

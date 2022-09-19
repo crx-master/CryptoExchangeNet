@@ -1,4 +1,9 @@
-﻿using System;
+﻿using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using SharpCryptoExchange.Logging;
+using SharpCryptoExchange.Objects;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -6,11 +11,6 @@ using System.Runtime.InteropServices;
 using System.Security;
 using System.Text;
 using System.Web;
-using SharpCryptoExchange.Logging;
-using SharpCryptoExchange.Objects;
-using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace SharpCryptoExchange
 {
@@ -125,20 +125,20 @@ namespace SharpCryptoExchange
         public static string CreateParamString(this Dictionary<string, object> parameters, bool urlEncodeValues, ArrayParametersSerialization serializationType)
         {
             var uriString = string.Empty;
-            var arraysParameters = parameters.Where(p => p.Value.GetType().IsArray).ToList();
+            List<KeyValuePair<string, object>> arraysParameters = parameters.Where(p => p.Value.GetType().IsArray).ToList();
             foreach (var arrayEntry in arraysParameters)
             {
                 if (serializationType == ArrayParametersSerialization.Array)
-                    uriString += $"{string.Join("&", ((object[])(urlEncodeValues ? Uri.EscapeDataString(arrayEntry.Value.ToString()) : arrayEntry.Value)).Select(v => $"{arrayEntry.Key}[]={v}"))}&";
+                    uriString += $"{string.Join("&", ((object[])(urlEncodeValues ? Uri.EscapeDataString((string)arrayEntry.Value) : arrayEntry.Value)).Select(v => $"{arrayEntry.Key}[]={v}"))}&";
                 else
                 {
                     var array = (Array)arrayEntry.Value;
-                    uriString += string.Join("&", array.OfType<object>().Select(a => $"{arrayEntry.Key}={Uri.EscapeDataString(a.ToString())}"));
+                    uriString += string.Join("&", array.OfType<object>().Select(a => $"{arrayEntry.Key}={Uri.EscapeDataString($"{a}")}"));
                     uriString += "&";
                 }
             }
 
-            uriString += $"{string.Join("&", parameters.Where(p => !p.Value.GetType().IsArray).Select(s => $"{s.Key}={(urlEncodeValues ? Uri.EscapeDataString(s.Value.ToString()) : s.Value)}"))}";
+            uriString += $"{string.Join("&", parameters.Where(p => !p.Value.GetType().IsArray).Select(s => $"{s.Key}={(urlEncodeValues ? Uri.EscapeDataString($"{s.Value}") : s.Value)}"))}";
             uriString = uriString.TrimEnd('&');
             return uriString;
         }
@@ -162,9 +162,9 @@ namespace SharpCryptoExchange
                 else
                     formData.Add(kvp.Key, kvp.Value.ToString());
             }
-            return formData.ToString();
+            return $"{formData}";
         }
-        
+
 
         /// <summary>
         /// Get the string the secure string is representing
@@ -423,15 +423,17 @@ namespace SharpCryptoExchange
         /// <returns></returns>
         public static Uri SetParameters(this Uri baseUri, SortedDictionary<string, object> parameters, ArrayParametersSerialization arraySerialization)
         {
-            var uriBuilder = new UriBuilder();
-            uriBuilder.Scheme = baseUri.Scheme;
-            uriBuilder.Host = baseUri.Host;
-            uriBuilder.Port = baseUri.Port;
-            uriBuilder.Path = baseUri.AbsolutePath;
+            var uriBuilder = new UriBuilder
+            {
+                Scheme = baseUri.Scheme,
+                Host = baseUri.Host,
+                Port = baseUri.Port,
+                Path = baseUri.AbsolutePath
+            };
             var httpValueCollection = HttpUtility.ParseQueryString(string.Empty);
             foreach (var parameter in parameters)
             {
-                if(parameter.Value.GetType().IsArray)
+                if (parameter.Value.GetType().IsArray)
                 {
                     foreach (var item in (object[])parameter.Value)
                         httpValueCollection.Add(arraySerialization == ArrayParametersSerialization.Array ? parameter.Key + "[]" : parameter.Key, item.ToString());
@@ -452,11 +454,13 @@ namespace SharpCryptoExchange
         /// <returns></returns>
         public static Uri SetParameters(this Uri baseUri, IOrderedEnumerable<KeyValuePair<string, object>> parameters, ArrayParametersSerialization arraySerialization)
         {
-            var uriBuilder = new UriBuilder();
-            uriBuilder.Scheme = baseUri.Scheme;
-            uriBuilder.Host = baseUri.Host;
-            uriBuilder.Port = baseUri.Port;
-            uriBuilder.Path = baseUri.AbsolutePath;
+            var uriBuilder = new UriBuilder
+            {
+                Scheme = baseUri.Scheme,
+                Host = baseUri.Host,
+                Port = baseUri.Port,
+                Path = baseUri.AbsolutePath
+            };
             var httpValueCollection = HttpUtility.ParseQueryString(string.Empty);
             foreach (var parameter in parameters)
             {
@@ -487,8 +491,10 @@ namespace SharpCryptoExchange
             httpValueCollection.Remove(name);
             httpValueCollection.Add(name, value);
 
-            var ub = new UriBuilder(uri);
-            ub.Query = httpValueCollection.ToString();
+            UriBuilder ub = new(uri)
+            {
+                Query = httpValueCollection.ToString()
+            };
 
             return ub.Uri;
         }

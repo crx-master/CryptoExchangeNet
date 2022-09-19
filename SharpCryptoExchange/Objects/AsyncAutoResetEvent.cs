@@ -12,7 +12,7 @@ namespace SharpCryptoExchange.Objects
     public class AsyncResetEvent : IDisposable
     {
         private static readonly Task<bool> _completed = Task.FromResult(true);
-        private readonly Queue<TaskCompletionSource<bool>> _waits = new Queue<TaskCompletionSource<bool>>();
+        private readonly Queue<TaskCompletionSource<bool>> _waits = new();
         private bool _signaled;
         private readonly bool _reset;
 
@@ -37,14 +37,14 @@ namespace SharpCryptoExchange.Objects
             {
                 if (_signaled)
                 {
-                    if(_reset)
+                    if (_reset)
                         _signaled = false;
                     return _completed;
                 }
                 else
                 {
                     var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-                    if(timeout != null)
+                    if (timeout != null)
                     {
                         var cancellationSource = new CancellationTokenSource(timeout.Value);
                         var registration = cancellationSource.Token.Register(() =>
@@ -93,9 +93,6 @@ namespace SharpCryptoExchange.Objects
         /// <summary>
         /// Dispose
         /// </summary>
-        public void Dispose()
-        {
-            _waits.Clear();
-        }
+        public void Dispose() => _waits.Clear();
     }
 }

@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace SharpCryptoExchange.CommonObjects
+﻿namespace SharpCryptoExchange.CommonObjects
 {
     /// <summary>
     /// Order type
@@ -55,7 +51,7 @@ namespace SharpCryptoExchange.CommonObjects
         /// </summary>
         Filled
     }
-    
+
     /// <summary>
     /// Position side
     /// </summary>

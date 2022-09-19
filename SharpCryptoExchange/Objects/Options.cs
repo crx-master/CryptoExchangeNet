@@ -1,11 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http;
+﻿using Microsoft.Extensions.Logging;
 using SharpCryptoExchange.Authentication;
 using SharpCryptoExchange.Interfaces;
 using SharpCryptoExchange.Logging;
-using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net.Http;
 
 namespace SharpCryptoExchange.Objects
 {
@@ -30,7 +30,7 @@ namespace SharpCryptoExchange.Objects
             }
         }
 
-        private List<ILogger> _logWriters = new List<ILogger> { new DebugLogger() };
+        private List<ILogger> _logWriters = new() { new DebugLogger() };
         /// <summary>
         /// The log writers
         /// </summary>
@@ -52,7 +52,7 @@ namespace SharpCryptoExchange.Objects
         /// <summary>
         /// ctor
         /// </summary>
-        public BaseOptions(): this(null)
+        public BaseOptions() : this(null)
         {
         }
 
@@ -137,7 +137,7 @@ namespace SharpCryptoExchange.Objects
         /// <summary>
         /// ctor
         /// </summary>
-        public BaseRestClientOptions(): this(null)
+        public BaseRestClientOptions() : this(null)
         {
         }
 
@@ -145,7 +145,7 @@ namespace SharpCryptoExchange.Objects
         /// ctor
         /// </summary>
         /// <param name="baseOptions">Copy options from these options to the new options</param>
-        public BaseRestClientOptions(BaseRestClientOptions? baseOptions): base(baseOptions)
+        public BaseRestClientOptions(BaseRestClientOptions? baseOptions) : base(baseOptions)
         {
             if (baseOptions == null)
                 return;
@@ -207,7 +207,7 @@ namespace SharpCryptoExchange.Objects
         /// <summary>
         /// ctor
         /// </summary>
-        public BaseSocketClientOptions(): this(null)
+        public BaseSocketClientOptions() : this(null)
         {
         }
 
@@ -215,7 +215,7 @@ namespace SharpCryptoExchange.Objects
         /// ctor
         /// </summary>
         /// <param name="baseOptions">Copy options from these options to the new options</param>
-        public BaseSocketClientOptions(BaseSocketClientOptions? baseOptions): base(baseOptions)
+        public BaseSocketClientOptions(BaseSocketClientOptions? baseOptions) : base(baseOptions)
         {
             if (baseOptions == null)
                 return;
@@ -244,21 +244,19 @@ namespace SharpCryptoExchange.Objects
         /// <summary>
         /// The base address of the API
         /// </summary>
-        public string BaseAddress { get; set; }
+        public string BaseAddress { get; set; } = string.Empty;
 
         /// <summary>
         /// The api credentials used for signing requests to this API. Overrides API credentials provided in the client options
         /// </summary>        
-        public ApiCredentials? ApiCredentials { get; set; }
+        public ApiCredentials? ApiCredentials { get; set; } = null;
 
         /// <summary>
         /// ctor
         /// </summary>
-#pragma warning disable 8618 // Will always get filled by the implementation
         public ApiClientOptions()
         {
         }
-#pragma warning restore 8618
 
         /// <summary>
         /// ctor
@@ -286,11 +284,11 @@ namespace SharpCryptoExchange.Objects
             return $"Credentials: {(ApiCredentials == null ? "-" : "Set")}, BaseAddress: {BaseAddress}";
         }
     }
-    
+
     /// <summary>
     /// Rest API client options
     /// </summary>
-    public class RestApiClientOptions: ApiClientOptions
+    public class RestApiClientOptions : ApiClientOptions
     {
         /// <summary>
         /// List of rate limiters to use
@@ -323,7 +321,7 @@ namespace SharpCryptoExchange.Objects
         /// ctor
         /// </summary>
         /// <param name="baseAddress">Base address for the API</param>
-        public RestApiClientOptions(string baseAddress): base(baseAddress)
+        public RestApiClientOptions(string baseAddress) : base(baseAddress)
         {
         }
 
@@ -332,7 +330,7 @@ namespace SharpCryptoExchange.Objects
         /// </summary>
         /// <param name="baseOn">Copy values for the provided options</param>
         /// <param name="newValues">Copy values for the provided options</param>
-        public RestApiClientOptions(RestApiClientOptions baseOn, RestApiClientOptions? newValues): base(baseOn, newValues)
+        public RestApiClientOptions(RestApiClientOptions baseOn, RestApiClientOptions? newValues) : base(baseOn, newValues)
         {
             RateLimitingBehaviour = newValues?.RateLimitingBehaviour ?? baseOn.RateLimitingBehaviour;
             AutoTimestamp = newValues?.AutoTimestamp ?? baseOn.AutoTimestamp;

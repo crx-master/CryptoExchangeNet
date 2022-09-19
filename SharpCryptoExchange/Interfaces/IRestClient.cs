@@ -1,13 +1,13 @@
-﻿using System;
-using SharpCryptoExchange.Authentication;
+﻿using SharpCryptoExchange.Authentication;
 using SharpCryptoExchange.Objects;
+using System;
 
 namespace SharpCryptoExchange.Interfaces
 {
     /// <summary>
     /// Base class for rest API implementations
     /// </summary>
-    public interface IRestClient: IDisposable
+    public interface IRestClient : IDisposable
     {
         /// <summary>
         /// The factory for creating requests. Used for unit testing

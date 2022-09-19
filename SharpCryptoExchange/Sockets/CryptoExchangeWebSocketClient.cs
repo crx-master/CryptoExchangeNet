@@ -1,7 +1,7 @@
-﻿using SharpCryptoExchange.Interfaces;
+﻿using Microsoft.Extensions.Logging;
+using SharpCryptoExchange.Interfaces;
 using SharpCryptoExchange.Logging;
 using SharpCryptoExchange.Objects;
-using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -9,7 +9,6 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.WebSockets;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -72,7 +71,7 @@ namespace SharpCryptoExchange.Sockets
         /// The timestamp this socket has been active for the last time
         /// </summary>
         public DateTime LastActionTime { get; private set; }
-        
+
         /// <inheritdoc />
         public Uri Uri => Parameters.Uri;
 
@@ -141,10 +140,10 @@ namespace SharpCryptoExchange.Sockets
         {
             if (!await ConnectInternalAsync().ConfigureAwait(false))
                 return false;
-            
+
             OnOpen?.Invoke();
             _processTask = ProcessAsync();
-            return true;            
+            return true;
         }
 
         /// <summary>
@@ -219,12 +218,12 @@ namespace SharpCryptoExchange.Sockets
                     _processState = ProcessState.Idle;
                     OnClose?.Invoke();
                     return;
-                }    
+                }
 
                 if (!_stopRequested)
                 {
                     _processState = ProcessState.Reconnecting;
-                    OnReconnecting?.Invoke();                    
+                    OnReconnecting?.Invoke();
                 }
 
                 var sinceLastReconnect = DateTime.UtcNow - _lastReconnectTime;
@@ -319,7 +318,7 @@ namespace SharpCryptoExchange.Sockets
             }
 
             await _closeTask.ConfigureAwait(false);
-            if(_processTask != null)
+            if (_processTask != null)
                 await _processTask.ConfigureAwait(false);
             OnClose?.Invoke();
             _log.Write(LogLevel.Debug, $"Socket {Id} closed");
@@ -351,7 +350,7 @@ namespace SharpCryptoExchange.Sockets
                     // So socket might go to aborted state, might still be open
                 }
             }
-            else if(_socket.State == WebSocketState.CloseReceived)
+            else if (_socket.State == WebSocketState.CloseReceived)
             {
                 try
                 {
@@ -379,6 +378,8 @@ namespace SharpCryptoExchange.Sockets
             _socket.Dispose();
             _ctsSource.Dispose();
             _log.Write(LogLevel.Trace, $"Socket {Id} disposed");
+
+            GC.SuppressFinalize(this);
         }
 
         /// <summary>
@@ -502,9 +503,9 @@ namespace SharpCryptoExchange.Sockets
                         {
                             // We received data, but it is not complete, write it to a memory stream for reassembling
                             multiPartMessage = true;
-                            memoryStream ??= new MemoryStream();
                             _log.Write(LogLevel.Trace, $"Socket {Id} received {receiveResult.Count} bytes in partial message");
-                            await memoryStream.WriteAsync(buffer.Array, buffer.Offset, receiveResult.Count).ConfigureAwait(false);
+                            memoryStream ??= new MemoryStream();
+                            await memoryStream.WriteAsync(buffer.Array.AsMemory(buffer.Offset, receiveResult.Count)).ConfigureAwait(false);
                         }
                         else
                         {
@@ -518,7 +519,8 @@ namespace SharpCryptoExchange.Sockets
                             {
                                 // Received the end of a multipart message, write to memory stream for reassembling
                                 _log.Write(LogLevel.Trace, $"Socket {Id} received {receiveResult.Count} bytes in partial message");
-                                await memoryStream!.WriteAsync(buffer.Array, buffer.Offset, receiveResult.Count).ConfigureAwait(false);
+                                memoryStream ??= new MemoryStream();
+                                await memoryStream.WriteAsync(buffer.Array.AsMemory(buffer.Offset, receiveResult.Count)).ConfigureAwait(false);
                             }
                             break;
                         }
@@ -541,20 +543,22 @@ namespace SharpCryptoExchange.Sockets
 
                     if (multiPartMessage)
                     {
+                        memoryStream ??= new MemoryStream();
+
                         // When the connection gets interupted we might not have received a full message
                         if (receiveResult?.EndOfMessage == true)
                         {
                             // Reassemble complete message from memory stream
-                            _log.Write(LogLevel.Trace, $"Socket {Id} reassembled message of {memoryStream!.Length} bytes");
-                            HandleMessage(memoryStream!.ToArray(), 0, (int)memoryStream.Length, receiveResult.MessageType);
+                            _log.Write(LogLevel.Trace, $"Socket {Id} reassembled message of {memoryStream.Length} bytes");
+                            HandleMessage(memoryStream.ToArray(), 0, (int)memoryStream.Length, receiveResult.MessageType);
                             memoryStream.Dispose();
                         }
                         else
-                            _log.Write(LogLevel.Trace, $"Socket {Id} discarding incomplete message of {memoryStream!.Length} bytes");
+                            _log.Write(LogLevel.Trace, $"Socket {Id} discarding incomplete message of {memoryStream.Length} bytes");
                     }
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 // Because this is running in a separate task and not awaited until the socket gets closed
                 // any exception here will crash the receive processing, but do so silently unless the socket gets stopped.
@@ -589,7 +593,7 @@ namespace SharpCryptoExchange.Sockets
                     Array.Copy(data, offset, relevantData, 0, count);
                     strData = Parameters.DataInterpreterBytes(relevantData);
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     _log.Write(LogLevel.Error, $"Socket {Id} unhandled exception during byte data interpretation: " + e.ToLogString());
                     return;
@@ -604,7 +608,7 @@ namespace SharpCryptoExchange.Sockets
                 {
                     strData = Parameters.DataInterpreterString(strData);
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     _log.Write(LogLevel.Error, $"Socket {Id} unhandled exception during string data interpretation: " + e.ToLogString());
                     return;
@@ -616,7 +620,7 @@ namespace SharpCryptoExchange.Sockets
                 LastActionTime = DateTime.UtcNow;
                 OnMessage?.Invoke(strData);
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 _log.Write(LogLevel.Error, $"Socket {Id} unhandled exception during message processing: " + e.ToLogString());
             }
@@ -666,8 +670,8 @@ namespace SharpCryptoExchange.Sockets
         {
             _log.Write(LogLevel.Debug, $"Socket {Id} Starting task checking for no data received for {Parameters.Timeout}");
             LastActionTime = DateTime.UtcNow;
-            try 
-            { 
+            try
+            {
                 while (true)
                 {
                     if (_ctsSource.IsCancellationRequested)
@@ -717,7 +721,7 @@ namespace SharpCryptoExchange.Sockets
         {
             var testTime = DateTime.UtcNow;
             _outgoingMessages.RemoveAll(r => testTime - r > TimeSpan.FromSeconds(1));
-            return _outgoingMessages.Count;            
+            return _outgoingMessages.Count;
         }
 
         /// <summary>

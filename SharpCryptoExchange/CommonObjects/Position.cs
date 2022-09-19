@@ -3,7 +3,7 @@
     /// <summary>
     /// Position data
     /// </summary>
-    public class Position: BaseCommonObject
+    public class Position : BaseCommonObject
     {
         /// <summary>
         /// Id of the position

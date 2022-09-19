@@ -5,7 +5,7 @@ namespace SharpCryptoExchange.CommonObjects
     /// <summary>
     /// Order data
     /// </summary>
-    public class Order: BaseCommonObject
+    public class Order : BaseCommonObject
     {
         /// <summary>
         /// Id of the order

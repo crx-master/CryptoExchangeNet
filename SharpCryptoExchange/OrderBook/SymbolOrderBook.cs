@@ -1,4 +1,9 @@
-﻿using System;
+﻿using Microsoft.Extensions.Logging;
+using SharpCryptoExchange.Interfaces;
+using SharpCryptoExchange.Logging;
+using SharpCryptoExchange.Objects;
+using SharpCryptoExchange.Sockets;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
@@ -6,11 +11,6 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using SharpCryptoExchange.Interfaces;
-using SharpCryptoExchange.Logging;
-using SharpCryptoExchange.Objects;
-using SharpCryptoExchange.Sockets;
-using Microsoft.Extensions.Logging;
 
 namespace SharpCryptoExchange.OrderBook
 {
@@ -19,11 +19,11 @@ namespace SharpCryptoExchange.OrderBook
     /// </summary>
     public abstract class SymbolOrderBook : ISymbolOrderBook, IDisposable
     {
-        private readonly object _bookLock = new object();
+        private readonly object _bookLock = new();
 
         private OrderBookStatus _status;
         private UpdateSubscription? _subscription;
-        
+
         private bool _stopProcessing;
         private Task? _processTask;
         private CancellationTokenSource? _cts;
@@ -34,10 +34,16 @@ namespace SharpCryptoExchange.OrderBook
 
         private class EmptySymbolOrderBookEntry : ISymbolOrderBookEntry
         {
-            public decimal Quantity { get => 0m;
-                set { } }
-            public decimal Price { get => 0m;
-                set { } }
+            public decimal Quantity
+            {
+                get => 0m;
+                set { }
+            }
+            public decimal Price
+            {
+                get => 0m;
+                set { }
+            }
         }
 
         private static readonly ISymbolOrderBookEntry emptySymbolOrderBookEntry = new EmptySymbolOrderBookEntry();
@@ -70,7 +76,7 @@ namespace SharpCryptoExchange.OrderBook
         /// the book will resynchronize as it is deemed out of sync
         /// </summary>
         protected bool sequencesAreConsecutive;
-        
+
         /// <summary>
         /// Whether levels should be strictly enforced. For example, when an order book has 25 levels and a new update comes in which pushes
         /// the current level 25 ask out of the top 25, should the curent the level 26 entry be removed from the book or does the 
@@ -92,7 +98,7 @@ namespace SharpCryptoExchange.OrderBook
         public string Id { get; }
 
         /// <inheritdoc/>
-        public OrderBookStatus Status 
+        public OrderBookStatus Status
         {
             get => _status;
             set
@@ -142,7 +148,7 @@ namespace SharpCryptoExchange.OrderBook
         }
 
         /// <inheritdoc/>
-        public IEnumerable<ISymbolOrderBookEntry> Bids 
+        public IEnumerable<ISymbolOrderBookEntry> Bids
         {
             get
             {
@@ -172,7 +178,7 @@ namespace SharpCryptoExchange.OrderBook
         }
 
         /// <inheritdoc/>
-        public ISymbolOrderBookEntry BestAsk 
+        public ISymbolOrderBookEntry BestAsk
         {
             get
             {
@@ -182,10 +188,12 @@ namespace SharpCryptoExchange.OrderBook
         }
 
         /// <inheritdoc/>
-        public (ISymbolOrderBookEntry Bid, ISymbolOrderBookEntry Ask) BestOffers {
-            get {
+        public (ISymbolOrderBookEntry Bid, ISymbolOrderBookEntry Ask) BestOffers
+        {
+            get
+            {
                 lock (_bookLock)
-                    return (BestBid,BestAsk);
+                    return (BestBid, BestAsk);
             }
         }
 
@@ -197,9 +205,6 @@ namespace SharpCryptoExchange.OrderBook
         /// <param name="options">The options for the order book</param>
         protected SymbolOrderBook(string id, string symbol, OrderBookOptions options)
         {
-            if (symbol == null)
-                throw new ArgumentNullException(nameof(symbol));
-
             if (options == null)
                 throw new ArgumentNullException(nameof(options));
 
@@ -209,7 +214,7 @@ namespace SharpCryptoExchange.OrderBook
             _queueEvent = new AsyncResetEvent(false, true);
 
             _validateChecksum = options.ChecksumValidationEnabled;
-            Symbol = symbol;
+            Symbol = symbol ?? throw new ArgumentNullException(nameof(symbol));
             Status = OrderBookStatus.Disconnected;
 
             asks = new SortedList<decimal, ISymbolOrderBookEntry>();
@@ -249,15 +254,16 @@ namespace SharpCryptoExchange.OrderBook
                 return new CallResult<bool>(startResult.Error!);
             }
 
+            _subscription = startResult.Data ?? throw new ApplicationException("null startResult.Data");
             if (_cts.IsCancellationRequested)
             {
                 log.Write(LogLevel.Debug, $"{Id} order book {Symbol} stopped while starting");
-                await startResult.Data.CloseAsync().ConfigureAwait(false);
+                await _subscription.CloseAsync()
+                                   .ConfigureAwait(false);
                 Status = OrderBookStatus.Disconnected;
                 return new CallResult<bool>(new CancellationRequestedError());
             }
 
-            _subscription = startResult.Data;
             _subscription.ConnectionLost += HandleConnectionLost;
             _subscription.ConnectionClosed += HandleConnectionClosed;
             _subscription.ConnectionRestored += HandleConnectionRestored;
@@ -266,21 +272,25 @@ namespace SharpCryptoExchange.OrderBook
             return new CallResult<bool>(true);
         }
 
-        private void HandleConnectionLost() {
-             log.Write(LogLevel.Warning, $"{Id} order book {Symbol} connection lost");
-             if (Status != OrderBookStatus.Disposed) {
+        private void HandleConnectionLost()
+        {
+            log.Write(LogLevel.Warning, $"{Id} order book {Symbol} connection lost");
+            if (Status != OrderBookStatus.Disposed)
+            {
                 Status = OrderBookStatus.Reconnecting;
                 Reset();
             }
         }
 
-        private void HandleConnectionClosed() {
+        private void HandleConnectionClosed()
+        {
             log.Write(LogLevel.Warning, $"{Id} order book {Symbol} disconnected");
             Status = OrderBookStatus.Disconnected;
             _ = StopAsync();
         }
 
-        private async void HandleConnectionRestored(TimeSpan _) {
+        private async void HandleConnectionRestored(TimeSpan _)
+        {
             await ResyncAsync().ConfigureAwait(false);
         }
 
@@ -294,7 +304,8 @@ namespace SharpCryptoExchange.OrderBook
             if (_processTask != null)
                 await _processTask.ConfigureAwait(false);
 
-            if (_subscription != null) {
+            if (_subscription != null)
+            {
                 await _subscription.CloseAsync().ConfigureAwait(false);
                 _subscription.ConnectionLost -= HandleConnectionLost;
                 _subscription.ConnectionClosed -= HandleConnectionClosed;
@@ -315,7 +326,7 @@ namespace SharpCryptoExchange.OrderBook
             lock (_bookLock)
             {
                 var list = type == OrderBookEntryType.Ask ? asks : bids;
-                
+
                 var step = 0;
                 while (amountLeft > 0)
                 {
@@ -359,7 +370,7 @@ namespace SharpCryptoExchange.OrderBook
         /// <param name="checksum"></param>
         /// <returns></returns>
         protected virtual bool DoChecksum(int checksum) => true;
-                
+
         /// <summary>
         /// Set the initial data for the order book. Typically the snapshot which was requested from the Rest API, or the first snapshot
         /// received from a socket subcription
@@ -455,7 +466,7 @@ namespace SharpCryptoExchange.OrderBook
             if (sequencesAreConsecutive && sequence > LastSequenceNumber + 1)
             {
                 // Out of sync
-                log.Write(LogLevel.Warning, $"{Id} order book {Symbol} out of sync (expected { LastSequenceNumber + 1}, was {sequence}), reconnecting");
+                log.Write(LogLevel.Warning, $"{Id} order book {Symbol} out of sync (expected {LastSequenceNumber + 1}, was {sequence}), reconnecting");
                 _stopProcessing = true;
                 Resubscribe();
                 return false;
@@ -500,7 +511,7 @@ namespace SharpCryptoExchange.OrderBook
             var startWait = DateTime.UtcNow;
             while (!bookSet && Status == OrderBookStatus.Syncing)
             {
-                if(ct.IsCancellationRequested)
+                if (ct.IsCancellationRequested)
                     return new CallResult<bool>(new CancellationRequestedError());
 
                 if (DateTime.UtcNow - startWait > timeout)
@@ -567,10 +578,10 @@ namespace SharpCryptoExchange.OrderBook
             var stringBuilder = new StringBuilder();
             var book = Book;
             stringBuilder.AppendLine($"   Ask quantity       Ask price | Bid price       Bid quantity");
-            for(var i = 0; i < numberOfEntries; i++)
+            for (var i = 0; i < numberOfEntries; i++)
             {
-                var ask = book.asks.Count() > i ? book.asks.ElementAt(i): null;
-                var bid = book.bids.Count() > i ? book.bids.ElementAt(i): null;
+                var ask = book.asks.Count() > i ? book.asks.ElementAt(i) : null;
+                var bid = book.bids.Count() > i ? book.bids.ElementAt(i) : null;
                 stringBuilder.AppendLine($"[{ask?.Quantity.ToString(CultureInfo.InvariantCulture),14}] {ask?.Price.ToString(CultureInfo.InvariantCulture),14} | {bid?.Price.ToString(CultureInfo.InvariantCulture),-14} [{bid?.Quantity.ToString(CultureInfo.InvariantCulture),-14}]");
             }
             return stringBuilder.ToString();
@@ -735,7 +746,7 @@ namespace SharpCryptoExchange.OrderBook
             Status = OrderBookStatus.Syncing;
             _ = Task.Run(async () =>
             {
-                if(_subscription == null)
+                if (_subscription == null)
                 {
                     Status = OrderBookStatus.Disconnected;
                     return;
@@ -787,14 +798,11 @@ namespace SharpCryptoExchange.OrderBook
 
             LastSequenceNumber = lastUpdateId;
             log.Write(LogLevel.Trace, $"{Id} order book {Symbol} update processed #{firstUpdateId}-{lastUpdateId}");
-        }        
+        }
     }
 
     internal class DescComparer<T> : IComparer<T>
     {
-        public int Compare(T x, T y)
-        {
-            return Comparer<T>.Default.Compare(y, x);
-        }
+        public int Compare(T? x, T? y) => Comparer<T>.Default.Compare(y, x);
     }
 }

@@ -18,7 +18,7 @@
     /// <summary>
     /// Interface for order book entries
     /// </summary>
-    public interface ISymbolOrderSequencedBookEntry: ISymbolOrderBookEntry
+    public interface ISymbolOrderSequencedBookEntry : ISymbolOrderBookEntry
     {
         /// <summary>
         /// Sequence of the update

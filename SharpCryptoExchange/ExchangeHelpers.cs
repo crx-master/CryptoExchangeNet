@@ -33,7 +33,7 @@ namespace SharpCryptoExchange
         /// <returns></returns>
         public static decimal AdjustValueStep(decimal min, decimal max, decimal? step, RoundingType roundingType, decimal value)
         {
-            if(step == 0)
+            if (step == 0)
                 throw new ArgumentException($"0 not allowed for parameter {nameof(step)}, pass in null to ignore the step size", nameof(step));
 
             value = Math.Min(max, value);
@@ -42,7 +42,7 @@ namespace SharpCryptoExchange
                 return value;
 
             var offset = value % step.Value;
-            if(roundingType == RoundingType.Down)
+            if (roundingType == RoundingType.Down)
                 value -= offset;
             else
             {
@@ -52,7 +52,7 @@ namespace SharpCryptoExchange
             }
 
             value = RoundDown(value, 8);
-                
+
             return value.Normalize();
         }
 
@@ -89,7 +89,7 @@ namespace SharpCryptoExchange
                 return 0;
 
             double scale = Math.Pow(10, Math.Floor(Math.Log10(Math.Abs(val))) + 1);
-            if(roundingType == RoundingType.Closest)
+            if (roundingType == RoundingType.Closest)
                 return (decimal)(scale * Math.Round(val / scale, digits));
             else
                 return (decimal)(scale * (double)RoundDown((decimal)(val / scale), digits));

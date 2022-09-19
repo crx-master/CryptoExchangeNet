@@ -31,7 +31,7 @@ namespace SharpCryptoExchange.Objects
         /// </summary>
         /// <param name="host">The proxy hostname/ip</param>
         /// <param name="port">The proxy port</param>
-        public ApiProxy(string host, int port): this(host, port, null, (SecureString?)null)
+        public ApiProxy(string host, int port) : this(host, port, null, (SecureString?)null)
         {
         }
 

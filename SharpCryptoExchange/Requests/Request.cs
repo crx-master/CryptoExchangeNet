@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SharpCryptoExchange.Interfaces;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -6,7 +7,6 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using SharpCryptoExchange.Interfaces;
 
 namespace SharpCryptoExchange.Requests
 {
@@ -30,7 +30,7 @@ namespace SharpCryptoExchange.Requests
             this.request = request;
             RequestId = requestId;
         }
-        
+
         /// <inheritdoc />
         public string? Content { get; private set; }
 
@@ -48,7 +48,13 @@ namespace SharpCryptoExchange.Requests
         }
 
         /// <inheritdoc />
-        public Uri Uri => request.RequestUri;
+        public Uri? Uri
+        {
+            get
+            {
+                return request.RequestUri;
+            }
+        }
 
         /// <inheritdoc />
         public int RequestId { get; }
