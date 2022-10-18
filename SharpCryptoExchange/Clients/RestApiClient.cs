@@ -62,36 +62,31 @@ namespace SharpCryptoExchange
             var timeSyncParams = GetTimeSyncInfo();
             if (await timeSyncParams.TimeSyncState.Semaphore.WaitAsync(0).ConfigureAwait(false))
             {
-                if (!timeSyncParams.SyncTime || (DateTime.UtcNow - timeSyncParams.TimeSyncState.LastSyncTime < timeSyncParams.RecalculationInterval))
+                try
                 {
-                    timeSyncParams.TimeSyncState.Semaphore.Release();
-                    return new WebCallResult<bool>(null, null, null, null, null, null, null, null, true, null);
-                }
+                    if (!timeSyncParams.SyncTime || (DateTime.UtcNow - timeSyncParams.TimeSyncState.LastSyncTime < timeSyncParams.RecalculationInterval))
+                        return new WebCallResult<bool>(null, null, null, null, null, null, null, null, true, null);
 
-                var localTime = DateTime.UtcNow;
-                var result = await GetServerTimestampAsync().ConfigureAwait(false);
-                if (!result)
-                {
-                    timeSyncParams.TimeSyncState.Semaphore.Release();
-                    return result.As(false);
-                }
+                    var localTime = DateTime.UtcNow;
+                    var result = await GetServerTimestampAsync().ConfigureAwait(false);
+                    if (!result) return result.As(false);
 
-                if (TotalRequestsMade == 1)
-                {
-                    // If this was the first request make another one to calculate the offset since the first one can be slower
-                    localTime = DateTime.UtcNow;
-                    result = await GetServerTimestampAsync().ConfigureAwait(false);
-                    if (!result)
+                    if (TotalRequestsMade == 1)
                     {
-                        timeSyncParams.TimeSyncState.Semaphore.Release();
-                        return result.As(false);
+                        // If this was the first request make another one to calculate the offset since the first one can be slower
+                        localTime = DateTime.UtcNow;
+                        result = await GetServerTimestampAsync().ConfigureAwait(false);
+                        if (!result) return result.As(false);
                     }
-                }
 
-                // Calculate time offset between local and server
-                var offset = result.Data - (localTime.AddMilliseconds(result.ResponseTime!.Value.TotalMilliseconds / 2));
-                timeSyncParams.UpdateTimeOffset(offset);
-                timeSyncParams.TimeSyncState.Semaphore.Release();
+                    // Calculate time offset between local and server
+                    var offset = result.Data - (localTime.AddMilliseconds(result.ResponseTime!.Value.TotalMilliseconds / 2));
+                    timeSyncParams.UpdateTimeOffset(offset);
+                }
+                finally
+                {
+                    timeSyncParams.TimeSyncState.Semaphore.Release();
+                }
             }
 
             return new WebCallResult<bool>(null, null, null, null, null, null, null, null, true, null);

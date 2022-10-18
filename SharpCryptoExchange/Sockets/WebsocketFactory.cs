@@ -1,5 +1,6 @@
-﻿using SharpCryptoExchange.Interfaces;
-using SharpCryptoExchange.Logging;
+﻿using Microsoft.Extensions.Logging;
+using SharpCryptoExchange.Interfaces;
+
 
 namespace SharpCryptoExchange.Sockets
 {
@@ -9,9 +10,9 @@ namespace SharpCryptoExchange.Sockets
     public class WebsocketFactory : IWebsocketFactory
     {
         /// <inheritdoc />
-        public IWebsocket CreateWebsocket(Log log, WebSocketParameters parameters)
+        public IWebsocket CreateWebsocket(ILogger logger, WebSocketParameters parameters)
         {
-            return new CryptoExchangeWebSocketClient(log, parameters);
+            return new CryptoExchangeWebSocketClient(logger, parameters);
         }
     }
 }

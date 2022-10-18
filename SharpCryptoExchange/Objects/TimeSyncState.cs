@@ -45,7 +45,7 @@ namespace SharpCryptoExchange.Objects
         /// <summary>
         /// Logger
         /// </summary>
-        public Log Log { get; }
+        public ILogger Logger { get; }
         /// <summary>
         /// Should synchronize time
         /// </summary>
@@ -62,13 +62,13 @@ namespace SharpCryptoExchange.Objects
         /// <summary>
         /// ctor
         /// </summary>
-        /// <param name="log"></param>
+        /// <param name="logger"></param>
         /// <param name="recalculationInterval"></param>
         /// <param name="syncTime"></param>
         /// <param name="syncState"></param>
-        public TimeSyncInfo(Log log, bool syncTime, TimeSpan recalculationInterval, TimeSyncState syncState)
+        public TimeSyncInfo(ILogger logger, bool syncTime, TimeSpan recalculationInterval, TimeSyncState syncState)
         {
-            Log = log;
+            Logger = logger;
             SyncTime = syncTime;
             RecalculationInterval = recalculationInterval;
             TimeSyncState = syncState;
@@ -83,12 +83,12 @@ namespace SharpCryptoExchange.Objects
             TimeSyncState.LastSyncTime = DateTime.UtcNow;
             if (offset.TotalMilliseconds > 0 && offset.TotalMilliseconds < 500)
             {
-                Log.Write(LogLevel.Information, $"{TimeSyncState.ApiName} Time offset within limits, set offset to 0ms");
+                LogHelper.LogInformationMessage(Logger, $"[{TimeSyncState.ApiName}] Time offset within limits, set offset to 0ms" );
                 TimeSyncState.TimeOffset = TimeSpan.Zero;
             }
             else
             {
-                Log.Write(LogLevel.Information, $"{TimeSyncState.ApiName} Time offset set to {Math.Round(offset.TotalMilliseconds)}ms");
+                LogHelper.LogInformationMessage(Logger,  $"{TimeSyncState.ApiName} Time offset set to {Math.Round(offset.TotalMilliseconds)}ms");
                 TimeSyncState.TimeOffset = offset;
             }
         }

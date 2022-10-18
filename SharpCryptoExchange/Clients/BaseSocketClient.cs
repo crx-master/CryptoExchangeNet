@@ -2,6 +2,7 @@
 using Newtonsoft.Json.Linq;
 using SharpCryptoExchange.Authentication;
 using SharpCryptoExchange.Interfaces;
+using SharpCryptoExchange.Logging;
 using SharpCryptoExchange.Objects;
 using SharpCryptoExchange.Sockets;
 using System;
@@ -203,7 +204,8 @@ namespace SharpCryptoExchange
                     subscription = AddSubscription(request, identifier, true, socketConnection, dataHandler, authenticated);
                     if (subscription == null)
                     {
-                        Log.Write(LogLevel.Trace, $"Socket {socketConnection?.SocketId} failed to add subscription, retrying on different connection");
+                        if (Logger != null && Logger.IsEnabled(LogLevel.Trace))
+                            LogHelper.LogTraceMessage(Logger,  $"Socket {socketConnection?.SocketId} failed to add subscription, retrying on different connection");
                         continue;
                     }
 
@@ -233,7 +235,7 @@ namespace SharpCryptoExchange
 
             if (socketConnection.PausedActivity)
             {
-                Log.Write(LogLevel.Warning, $"Socket {socketConnection.SocketId} has been paused, can't subscribe at this moment");
+                LogHelper.LogWarningMessage(Logger, $"Socket {socketConnection.SocketId} has been paused, can't subscribe at this moment");
                 return new CallResult<UpdateSubscription>(new ServerError("Socket is paused"));
             }
 
@@ -243,7 +245,7 @@ namespace SharpCryptoExchange
                 var subResult = await SubscribeAndWaitAsync(socketConnection, request, subscription).ConfigureAwait(false);
                 if (!subResult)
                 {
-                    Log.Write(LogLevel.Warning, $"Socket {socketConnection.SocketId} failed to subscribe: {subResult.Error}");
+                    LogHelper.LogWarningMessage(Logger, $"Socket {socketConnection.SocketId} failed to subscribe: {subResult.Error}");
                     await socketConnection.CloseAsync(subscription).ConfigureAwait(false);
                     return new CallResult<UpdateSubscription>(subResult.Error!);
                 }
@@ -258,12 +260,12 @@ namespace SharpCryptoExchange
             {
                 subscription.CancellationTokenRegistration = ct.Register(async () =>
                 {
-                    Log.Write(LogLevel.Information, $"Socket {socketConnection.SocketId} Cancellation token set, closing subscription");
+                    LogHelper.LogInformationMessage(Logger,  $"Socket {socketConnection.SocketId} Cancellation token set, closing subscription");
                     await socketConnection.CloseAsync(subscription).ConfigureAwait(false);
                 }, false);
             }
 
-            Log.Write(LogLevel.Information, $"Socket {socketConnection.SocketId} subscription {subscription.Id} completed successfully");
+            LogHelper.LogInformationMessage(Logger,  $"Socket {socketConnection.SocketId} subscription {subscription.Id} completed successfully");
 
             return new CallResult<UpdateSubscription>(new UpdateSubscription(socketConnection, subscription));
         }
@@ -349,7 +351,7 @@ namespace SharpCryptoExchange
 
             if (socketConnection != null && socketConnection.PausedActivity)
             {
-                Log.Write(LogLevel.Warning, $"Socket {socketConnection.SocketId} has been paused, can't send query at this moment");
+                LogHelper.LogWarningMessage(Logger, $"Socket {socketConnection.SocketId} has been paused, can't send query at this moment");
                 return new CallResult<T>(new ServerError("Socket is paused"));
             }
 
@@ -401,11 +403,11 @@ namespace SharpCryptoExchange
             if (!authenticated || socket.Authenticated)
                 return new CallResult<bool>(true);
 
-            Log.Write(LogLevel.Debug, $"Attempting to authenticate {socket.SocketId}");
+            LogHelper.LogDebugMessage(Logger, $"Attempting to authenticate {socket.SocketId}");
             var result = await AuthenticateSocketAsync(socket).ConfigureAwait(false);
             if (!result)
             {
-                Log.Write(LogLevel.Warning, $"Socket {socket.SocketId} authentication failed");
+                LogHelper.LogWarningMessage(Logger, $"Socket {socket.SocketId} authentication failed");
                 if (socket.Connected)
                     await socket.CloseAsync().ConfigureAwait(false);
 
@@ -514,7 +516,7 @@ namespace SharpCryptoExchange
                 var desResult = Deserialize<T>(messageEvent.JsonData);
                 if (!desResult)
                 {
-                    Log.Write(LogLevel.Warning, $"Socket {connection.SocketId} failed to deserialize data into type {typeof(T)}: {desResult.Error}");
+                    LogHelper.LogWarningMessage(Logger, $"Socket {connection.SocketId} failed to deserialize data into type {typeof(T)}: {desResult.Error}");
                     return;
                 }
 
@@ -591,12 +593,12 @@ namespace SharpCryptoExchange
             var connectionAddress = await GetConnectionUrlAsync(apiClient, address, authenticated).ConfigureAwait(false);
             if (!connectionAddress)
             {
-                Log.Write(LogLevel.Warning, $"Failed to determine connection url: " + connectionAddress.Error);
+                LogHelper.LogWarningMessage(Logger, $"Failed to determine connection url: " + connectionAddress.Error);
                 return connectionAddress.As<SocketConnection>(null);
             }
 
             if (connectionAddress.Data != address)
-                Log.Write(LogLevel.Debug, $"Connection address set to " + connectionAddress.Data);
+                LogHelper.LogDebugMessage(Logger, $"Connection address set to " + connectionAddress.Data);
 
             // Create new socket
             var socket = CreateSocket(connectionAddress.Data!);
@@ -660,8 +662,8 @@ namespace SharpCryptoExchange
         /// <returns></returns>
         protected virtual IWebsocket CreateSocket(string address)
         {
-            var socket = SocketFactory.CreateWebsocket(Log, GetWebSocketParameters(address));
-            Log.Write(LogLevel.Debug, $"Socket {socket.Id} new socket created for " + address);
+            var socket = SocketFactory.CreateWebsocket(Logger, GetWebSocketParameters(address));
+            LogHelper.LogDebugMessage(Logger, $"Socket {socket.Id} new socket created for " + address);
             return socket;
         }
 
@@ -697,7 +699,7 @@ namespace SharpCryptoExchange
                         if (obj == null)
                             continue;
 
-                        Log.Write(LogLevel.Trace, $"Socket {socketConnection.SocketId} sending periodic {identifier}");
+                        LogHelper.LogTraceMessage(Logger,  $"Socket {socketConnection.SocketId} sending periodic {identifier}");
 
                         try
                         {
@@ -705,7 +707,7 @@ namespace SharpCryptoExchange
                         }
                         catch (Exception ex)
                         {
-                            Log.Write(LogLevel.Warning, $"Socket {socketConnection.SocketId} Periodic send {identifier} failed: " + ex.ToLogString());
+                            LogHelper.LogWarningMessage(Logger, $"Socket {socketConnection.SocketId} Periodic send {identifier} failed: " + ex.ToLogString());
                         }
                     }
                 }
@@ -734,7 +736,7 @@ namespace SharpCryptoExchange
             if (subscription == null || connection == null)
                 return;
 
-            Log.Write(LogLevel.Information, $"Socket {connection.SocketId} Unsubscribing subscription " + subscriptionId);
+            LogHelper.LogInformationMessage(Logger,  $"Socket {connection.SocketId} Unsubscribing subscription " + subscriptionId);
             await connection.CloseAsync(subscription).ConfigureAwait(false);
         }
 
@@ -748,7 +750,7 @@ namespace SharpCryptoExchange
             if (subscription == null)
                 throw new ArgumentNullException(nameof(subscription));
 
-            Log.Write(LogLevel.Information, $"Socket {subscription.SocketId} Unsubscribing subscription  " + subscription.Id);
+            LogHelper.LogInformationMessage(Logger,  $"Socket {subscription.SocketId} Unsubscribing subscription  " + subscription.Id);
             await subscription.CloseAsync().ConfigureAwait(false);
         }
 
@@ -758,7 +760,7 @@ namespace SharpCryptoExchange
         /// <returns></returns>
         public virtual async Task UnsubscribeAllAsync()
         {
-            Log.Write(LogLevel.Information, $"Unsubscribing all {SocketConnections.Sum(s => s.Value.SubscriptionCount)} subscriptions");
+            LogHelper.LogInformationMessage(Logger,  $"Unsubscribing all {SocketConnections.Sum(s => s.Value.SubscriptionCount)} subscriptions");
             var tasks = new List<Task>();
             {
                 var socketList = SocketConnections.Values;
@@ -775,7 +777,7 @@ namespace SharpCryptoExchange
         /// <returns></returns>
         public virtual async Task ReconnectAsync()
         {
-            Log.Write(LogLevel.Information, $"Reconnecting all {SocketConnections.Count} connections");
+            LogHelper.LogInformationMessage(Logger,  $"Reconnecting all {SocketConnections.Count} connections");
             var tasks = new List<Task>();
             {
                 var socketList = SocketConnections.Values;
@@ -812,7 +814,7 @@ namespace SharpCryptoExchange
             periodicEvent?.Dispose();
             if (SocketConnections.Sum(s => s.Value.SubscriptionCount) > 0)
             {
-                Log.Write(LogLevel.Debug, "Disposing socket client, closing all subscriptions");
+                LogHelper.LogDebugMessage(Logger, "Disposing socket client, closing all subscriptions");
                 _ = UnsubscribeAllAsync();
             }
             semaphoreSlim?.Dispose();

@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SharpCryptoExchange.Authentication;
 using SharpCryptoExchange.Interfaces;
+using SharpCryptoExchange.Logging;
 using SharpCryptoExchange.Objects;
 using SharpCryptoExchange.Requests;
 using System;
@@ -177,7 +178,7 @@ namespace SharpCryptoExchange
                     var syncTimeResult = await syncTask.ConfigureAwait(false);
                     if (!syncTimeResult)
                     {
-                        Log.Write(LogLevel.Debug, $"[{requestId}] Failed to sync time, aborting request: " + syncTimeResult.Error);
+                        LogHelper.LogDebugMessage(Logger, $"[{requestId}] Failed to sync time, aborting request: " + syncTimeResult.Error);
                         return syncTimeResult.As<IRequest>(default);
                     }
                 }
@@ -187,7 +188,7 @@ namespace SharpCryptoExchange
             {
                 foreach (var limiter in apiClient.RateLimiters)
                 {
-                    var limitResult = await limiter.LimitRequestAsync(Log, uri.AbsolutePath, method, signed, apiClient.Options.ApiCredentials?.Key, apiClient.Options.RateLimitingBehaviour, requestWeight, cancellationToken).ConfigureAwait(false);
+                    var limitResult = await limiter.LimitRequestAsync(Logger, uri.AbsolutePath, method, signed, apiClient.Options.ApiCredentials?.Key, apiClient.Options.RateLimitingBehaviour, requestWeight, cancellationToken).ConfigureAwait(false);
                     if (!limitResult.Success)
                         return new CallResult<IRequest>(limitResult.Error!);
                 }
@@ -195,11 +196,11 @@ namespace SharpCryptoExchange
 
             if (signed && apiClient.AuthenticationProvider == null)
             {
-                Log.Write(LogLevel.Warning, $"[{requestId}] Request {uri.AbsolutePath} failed because no ApiCredentials were provided");
+                LogHelper.LogWarningMessage(Logger, $"[{requestId}] Request {uri.AbsolutePath} failed because no ApiCredentials were provided");
                 return new CallResult<IRequest>(new NoApiCredentialsError());
             }
 
-            Log.Write(LogLevel.Information, $"[{requestId}] Creating request for " + uri);
+            LogHelper.LogCreatingRequest(Logger, requestId, uri);
             var paramsPosition = parameterPosition ?? apiClient.ParameterPositions[method];
             var request = ConstructRequest(apiClient, uri, method, parameters, signed, paramsPosition, arraySerialization ?? apiClient.arraySerialization, requestId, additionalHeaders);
 
@@ -212,7 +213,8 @@ namespace SharpCryptoExchange
                 paramString += " with headers " + string.Join(", ", headers.Select(h => h.Key + $"=[{string.Join(",", h.Value)}]"));
 
             apiClient.TotalRequestsMade++;
-            Log.Write(LogLevel.Trace, $"[{requestId}] Sending {method}{(signed ? " signed" : "")} request to {request.Uri}{paramString ?? " "}{(ClientOptions.Proxy == null ? "" : $" via proxy {ClientOptions.Proxy.Host}")}");
+            if (Logger != null && Logger.IsEnabled(LogLevel.Trace))
+                LogHelper.LogTraceMessage(Logger,  $"[{requestId}] Sending {method}{(signed ? " signed" : "")} request to {request.Uri}{paramString ?? " "}{(ClientOptions.Proxy == null ? "" : $" via proxy {ClientOptions.Proxy.Host}")}");
             return new CallResult<IRequest>(request);
         }
 
@@ -253,7 +255,8 @@ namespace SharpCryptoExchange
                         var data = await reader.ReadToEndAsync().ConfigureAwait(false);
                         responseStream.Close();
                         response.Close();
-                        Log.Write(LogLevel.Debug, $"[{request.RequestId}] Response received in {sw.ElapsedMilliseconds}ms{(Log.Level == LogLevel.Trace ? (": " + data) : "")}");
+                        LogHelper.LogDebugMessage(Logger, $"[{request.RequestId}] Response received in {sw.ElapsedMilliseconds}ms");
+                        LogHelper.TraceJsonString(Logger, data);
 
                         string uriString = request.Uri != null ? $"{request.Uri}" : string.Empty;
 
@@ -335,7 +338,7 @@ namespace SharpCryptoExchange
                     // Http status code indicates error
                     using var reader = new StreamReader(responseStream);
                     var data = await reader.ReadToEndAsync().ConfigureAwait(false);
-                    Log.Write(LogLevel.Warning, $"[{request.RequestId}] Error received in {sw.ElapsedMilliseconds}ms: {data}");
+                    LogHelper.LogWarningMessage(Logger, $"[{request.RequestId}] Error received in {sw.ElapsedMilliseconds}ms: {data}");
                     responseStream.Close();
                     response.Close();
                     var parseResult = ValidateJson(data);
@@ -349,7 +352,7 @@ namespace SharpCryptoExchange
             {
                 // Request exception, can't reach server for instance
                 var exceptionInfo = requestException.ToLogString();
-                Log.Write(LogLevel.Warning, $"[{request.RequestId}] Request exception: " + exceptionInfo);
+                LogHelper.LogWarningMessage(Logger, $"[{request.RequestId}] Request exception: " + exceptionInfo);
                 return new WebCallResult<T>(null, null, null, null, $"{request.Uri}", request.Content, request.Method, request.GetHeaders(), default, new WebError(exceptionInfo));
             }
             catch (OperationCanceledException canceledException)
@@ -357,13 +360,13 @@ namespace SharpCryptoExchange
                 if (cancellationToken != default && canceledException.CancellationToken == cancellationToken)
                 {
                     // Cancellation token canceled by caller
-                    Log.Write(LogLevel.Warning, $"[{request.RequestId}] Request canceled by cancellation token");
+                    LogHelper.LogWarningMessage(Logger, $"[{request.RequestId}] Request canceled by cancellation token");
                     return new WebCallResult<T>(null, null, null, null, $"{request.Uri}", request.Content, request.Method, request.GetHeaders(), default, new CancellationRequestedError());
                 }
                 else
                 {
                     // Request timed out
-                    Log.Write(LogLevel.Warning, $"[{request.RequestId}] Request timed out: " + canceledException.ToLogString());
+                    LogHelper.LogWarningMessage(Logger, $"[{request.RequestId}] Request timed out: " + canceledException.ToLogString());
                     return new WebCallResult<T>(null, null, null, null, $"{request.Uri}", request.Content, request.Method, request.GetHeaders(), default, new WebError($"[{request.RequestId}] Request timed out"));
                 }
             }

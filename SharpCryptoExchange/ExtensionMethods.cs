@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using SharpCryptoExchange.Logging;
 using SharpCryptoExchange.Objects;
 using System;
 using System.Collections.Generic;
@@ -252,9 +251,9 @@ namespace SharpCryptoExchange
         /// String to JToken
         /// </summary>
         /// <param name="stringData"></param>
-        /// <param name="log"></param>
+        /// <param name="logger"></param>
         /// <returns></returns>
-        public static JToken? ToJToken(this string stringData, Log? log = null)
+        public static JToken? ToJToken(this string stringData, ILogger? logger = null)
         {
             if (string.IsNullOrEmpty(stringData))
                 return null;
@@ -266,15 +265,15 @@ namespace SharpCryptoExchange
             catch (JsonReaderException jre)
             {
                 var info = $"Deserialize JsonReaderException: {jre.Message}, Path: {jre.Path}, LineNumber: {jre.LineNumber}, LinePosition: {jre.LinePosition}. Data: {stringData}";
-                log?.Write(LogLevel.Error, info);
-                if (log == null) Trace.WriteLine($"{DateTime.Now:yyyy/MM/dd HH:mm:ss:fff} | Warning | {info}");
+                logger?.LogError("ToJToken error. Info: {info}", info);
+                if (logger == null) Trace.WriteLine($"{DateTime.Now:yyyy/MM/dd HH:mm:ss:fff} | Warning | {info}");
                 return null;
             }
             catch (JsonSerializationException jse)
             {
                 var info = $"Deserialize JsonSerializationException: {jse.Message}. Data: {stringData}";
-                log?.Write(LogLevel.Error, info);
-                if (log == null) Trace.WriteLine($"{DateTime.Now:yyyy/MM/dd HH:mm:ss:fff} | Warning | {info}");
+                logger?.LogError("ToJToken error. Info: {info}", info);
+                if (logger == null) Trace.WriteLine($"{DateTime.Now:yyyy/MM/dd HH:mm:ss:fff} | Warning | {info}");
                 return null;
             }
         }

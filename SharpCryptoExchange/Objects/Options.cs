@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using SharpCryptoExchange.Authentication;
 using SharpCryptoExchange.Interfaces;
-using SharpCryptoExchange.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,35 +13,10 @@ namespace SharpCryptoExchange.Objects
     /// </summary>
     public class BaseOptions
     {
-        internal event Action? OnLoggingChanged;
-
-        private LogLevel _logLevel = LogLevel.Information;
         /// <summary>
-        /// The minimum log level to output
+        /// The log writer
         /// </summary>
-        public LogLevel LogLevel
-        {
-            get => _logLevel;
-            set
-            {
-                _logLevel = value;
-                OnLoggingChanged?.Invoke();
-            }
-        }
-
-        private List<ILogger> _logWriters = new() { new DebugLogger() };
-        /// <summary>
-        /// The log writers
-        /// </summary>
-        public List<ILogger> LogWriters
-        {
-            get => _logWriters;
-            set
-            {
-                _logWriters = value;
-                OnLoggingChanged?.Invoke();
-            }
-        }
+        public ILogger? Logger { get; set; } = null;
 
         /// <summary>
         /// If true, the CallResult and DataEvent objects will also include the originally received json data in the OriginalData property
@@ -65,15 +39,13 @@ namespace SharpCryptoExchange.Objects
             if (baseOptions == null)
                 return;
 
-            LogLevel = baseOptions.LogLevel;
-            LogWriters = baseOptions.LogWriters.ToList();
             OutputOriginalData = baseOptions.OutputOriginalData;
         }
 
         /// <inheritdoc />
         public override string ToString()
         {
-            return $"LogLevel: {LogLevel}, Writers: {LogWriters.Count}, OutputOriginalData: {OutputOriginalData}";
+            return $"Log writer: {Logger}, OutputOriginalData: {OutputOriginalData}";
         }
     }
 

@@ -34,7 +34,7 @@ namespace SharpCryptoExchange.Objects
         /// Overwrite bool check so we can use if(callResult) instead of if(callResult.Success)
         /// </summary>
         /// <param name="obj"></param>
-        public static implicit operator bool(CallResult obj)
+        public static implicit operator bool(CallResult? obj)
         {
             return obj?.Success == true;
         }

@@ -67,9 +67,9 @@ namespace SharpCryptoExchange.OrderBook
         protected SortedList<decimal, ISymbolOrderBookEntry> bids;
 
         /// <summary>
-        /// The log
+        /// The logger
         /// </summary>
-        protected Log log;
+        protected ILogger _logger;
 
         /// <summary>
         /// Whether update numbers are consecutive. If set to true and an update comes in which isn't the previous sequences number + 1
@@ -108,7 +108,7 @@ namespace SharpCryptoExchange.OrderBook
 
                 var old = _status;
                 _status = value;
-                log.Write(LogLevel.Information, $"{Id} order book {Symbol} status changed: {old} => {value}");
+                LogHelper.LogInformationMessage(_logger, $"{Id} order book {Symbol} status changed: {old} => {value}");
                 OnStatusChange?.Invoke(old, _status);
             }
         }
@@ -220,9 +220,10 @@ namespace SharpCryptoExchange.OrderBook
             asks = new SortedList<decimal, ISymbolOrderBookEntry>();
             bids = new SortedList<decimal, ISymbolOrderBookEntry>(new DescComparer<decimal>());
 
-            log = new Log(id) { Level = options.LogLevel };
-            var writers = options.LogWriters ?? new List<ILogger> { new DebugLogger() };
-            log.UpdateWriters(writers.ToList());
+            //_logger = new Log(id) { Level = options.LogLevel };
+            //var writers = options.LogWriters ?? new List<ILogger> { new DebugLogger() };
+            //_logger.UpdateWriters(writers.ToList());
+            _logger = options.Logger ?? throw new ArgumentNullException(nameof(options.Logger)); 
         }
 
         /// <inheritdoc/>
@@ -231,7 +232,7 @@ namespace SharpCryptoExchange.OrderBook
             if (Status != OrderBookStatus.Disconnected)
                 throw new InvalidOperationException($"Can't start book unless state is {OrderBookStatus.Disconnected}. Current state: {Status}");
 
-            log.Write(LogLevel.Debug, $"{Id} order book {Symbol} starting");
+            LogHelper.LogDebugMessage(_logger, $"{Id} order book {Symbol} starting");
             _cts = new CancellationTokenSource();
             ct?.Register(async () =>
             {
@@ -257,7 +258,7 @@ namespace SharpCryptoExchange.OrderBook
             _subscription = startResult.Data ?? throw new ApplicationException("null startResult.Data");
             if (_cts.IsCancellationRequested)
             {
-                log.Write(LogLevel.Debug, $"{Id} order book {Symbol} stopped while starting");
+                LogHelper.LogDebugMessage(_logger, $"{Id} order book {Symbol} stopped while starting");
                 await _subscription.CloseAsync()
                                    .ConfigureAwait(false);
                 Status = OrderBookStatus.Disconnected;
@@ -274,7 +275,7 @@ namespace SharpCryptoExchange.OrderBook
 
         private void HandleConnectionLost()
         {
-            log.Write(LogLevel.Warning, $"{Id} order book {Symbol} connection lost");
+            LogHelper.LogWarningMessage(_logger, $"{Id} order book {Symbol} connection lost");
             if (Status != OrderBookStatus.Disposed)
             {
                 Status = OrderBookStatus.Reconnecting;
@@ -284,7 +285,7 @@ namespace SharpCryptoExchange.OrderBook
 
         private void HandleConnectionClosed()
         {
-            log.Write(LogLevel.Warning, $"{Id} order book {Symbol} disconnected");
+            LogHelper.LogWarningMessage(_logger, $"{Id} order book {Symbol} disconnected");
             Status = OrderBookStatus.Disconnected;
             _ = StopAsync();
         }
@@ -297,7 +298,7 @@ namespace SharpCryptoExchange.OrderBook
         /// <inheritdoc/>
         public async Task StopAsync()
         {
-            log.Write(LogLevel.Debug, $"{Id} order book {Symbol} stopping");
+            LogHelper.LogDebugMessage(_logger, $"{Id} order book {Symbol} stopping");
             Status = OrderBookStatus.Disconnected;
             _cts?.Cancel();
             _queueEvent.Set();
@@ -311,7 +312,7 @@ namespace SharpCryptoExchange.OrderBook
                 _subscription.ConnectionClosed -= HandleConnectionClosed;
                 _subscription.ConnectionRestored -= HandleConnectionRestored;
             }
-            log.Write(LogLevel.Trace, $"{Id} order book {Symbol} stopped");
+            LogHelper.LogTraceMessage(_logger,  $"{Id} order book {Symbol} stopped");
         }
 
         /// <inheritdoc/>
@@ -440,7 +441,7 @@ namespace SharpCryptoExchange.OrderBook
         {
             var pbList = processBuffer.ToList();
             if (pbList.Count > 0)
-                log.Write(LogLevel.Debug, $"Processing {pbList.Count} buffered updates");
+                LogHelper.LogDebugMessage(_logger, $"Processing {pbList.Count} buffered updates");
 
             foreach (var bufferEntry in pbList)
             {
@@ -459,14 +460,14 @@ namespace SharpCryptoExchange.OrderBook
         {
             if (sequence <= LastSequenceNumber)
             {
-                log.Write(LogLevel.Debug, $"{Id} order book {Symbol} update skipped #{sequence}, currently at #{LastSequenceNumber}");
+                LogHelper.LogDebugMessage(_logger, $"{Id} order book {Symbol} update skipped #{sequence}, currently at #{LastSequenceNumber}");
                 return false;
             }
 
             if (sequencesAreConsecutive && sequence > LastSequenceNumber + 1)
             {
                 // Out of sync
-                log.Write(LogLevel.Warning, $"{Id} order book {Symbol} out of sync (expected {LastSequenceNumber + 1}, was {sequence}), reconnecting");
+                LogHelper.LogWarningMessage(_logger, $"{Id} order book {Symbol} out of sync (expected {LastSequenceNumber + 1}, was {sequence}), reconnecting");
                 _stopProcessing = true;
                 Resubscribe();
                 return false;
@@ -618,7 +619,7 @@ namespace SharpCryptoExchange.OrderBook
                 success = resyncResult;
             }
 
-            log.Write(LogLevel.Information, $"{Id} order book {Symbol} successfully resynchronized");
+            LogHelper.LogInformationMessage(_logger,  $"{Id} order book {Symbol} successfully resynchronized");
             Status = OrderBookStatus.Synced;
         }
 
@@ -635,7 +636,7 @@ namespace SharpCryptoExchange.OrderBook
 
                     if (_stopProcessing)
                     {
-                        log.Write(LogLevel.Trace, "Skipping message because of resubscribing");
+                        LogHelper.LogDebugMessage(_logger, "Skipping message because of resubscribing");
                         continue;
                     }
 
@@ -667,7 +668,7 @@ namespace SharpCryptoExchange.OrderBook
                 BidCount = bids.Count;
 
                 UpdateTime = DateTime.UtcNow;
-                log.Write(LogLevel.Debug, $"{Id} order book {Symbol} data set: {BidCount} bids, {AskCount} asks. #{item.EndUpdateId}");
+                LogHelper.LogDebugMessage(_logger, $"{Id} order book {Symbol} data set: {BidCount} bids, {AskCount} asks. #{item.EndUpdateId}");
                 CheckProcessBuffer();
                 OnOrderBookUpdate?.Invoke((item.Bids, item.Asks));
                 OnBestOffersChanged?.Invoke((BestBid, BestAsk));
@@ -687,7 +688,7 @@ namespace SharpCryptoExchange.OrderBook
                         FirstUpdateId = item.StartUpdateId,
                         LastUpdateId = item.EndUpdateId,
                     });
-                    log.Write(LogLevel.Trace, $"{Id} order book {Symbol} update buffered #{item.StartUpdateId}-#{item.EndUpdateId} [{item.Asks.Count()} asks, {item.Bids.Count()} bids]");
+                    LogHelper.LogTraceMessage(_logger, $"{Id} order book {Symbol} update buffered #{item.StartUpdateId}-#{item.EndUpdateId} [{item.Asks.Count()} asks, {item.Bids.Count()} bids]");
                 }
                 else
                 {
@@ -700,7 +701,7 @@ namespace SharpCryptoExchange.OrderBook
 
                     if (asks.First().Key < bids.First().Key)
                     {
-                        log.Write(LogLevel.Warning, $"{Id} order book {Symbol} detected out of sync order book. First ask: {asks.First().Key}, first bid: {bids.First().Key}. Resyncing");
+                        LogHelper.LogWarningMessage(_logger, $"{Id} order book {Symbol} detected out of sync order book. First ask: {asks.First().Key}, first bid: {bids.First().Key}. Resyncing");
                         _stopProcessing = true;
                         Resubscribe();
                         return;
@@ -734,7 +735,7 @@ namespace SharpCryptoExchange.OrderBook
 
                 if (!checksumResult)
                 {
-                    log.Write(LogLevel.Warning, $"{Id} order book {Symbol} out of sync. Resyncing");
+                    LogHelper.LogWarningMessage(_logger, $"{Id} order book {Symbol} out of sync. Resyncing");
                     _stopProcessing = true;
                     Resubscribe();
                 }
@@ -758,7 +759,7 @@ namespace SharpCryptoExchange.OrderBook
                 if (!await _subscription!.ResubscribeAsync().ConfigureAwait(false))
                 {
                     // Resubscribing failed, reconnect the socket
-                    log.Write(LogLevel.Warning, $"{Id} order book {Symbol} resync failed, reconnecting socket");
+                    LogHelper.LogWarningMessage(_logger, $"{Id} order book {Symbol} resync failed, reconnecting socket");
                     Status = OrderBookStatus.Reconnecting;
                     _ = _subscription!.ReconnectAsync();
                 }
@@ -771,7 +772,7 @@ namespace SharpCryptoExchange.OrderBook
         {
             if (lastUpdateId <= LastSequenceNumber)
             {
-                log.Write(LogLevel.Trace, $"{Id} order book {Symbol} update skipped #{firstUpdateId}-{lastUpdateId}");
+                LogHelper.LogTraceMessage(_logger,  $"{Id} order book {Symbol} update skipped #{firstUpdateId}-{lastUpdateId}");
                 return;
             }
 
@@ -797,7 +798,7 @@ namespace SharpCryptoExchange.OrderBook
             }
 
             LastSequenceNumber = lastUpdateId;
-            log.Write(LogLevel.Trace, $"{Id} order book {Symbol} update processed #{firstUpdateId}-{lastUpdateId}");
+            LogHelper.LogTraceMessage(_logger,  $"{Id} order book {Symbol} update processed #{firstUpdateId}-{lastUpdateId}");
         }
     }
 

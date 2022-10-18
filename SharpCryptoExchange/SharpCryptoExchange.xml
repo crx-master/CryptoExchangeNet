@@ -394,9 +394,9 @@
             Api clients in this client
             </summary>
         </member>
-        <member name="F:SharpCryptoExchange.BaseClient.Log">
+        <member name="P:SharpCryptoExchange.BaseClient.Logger">
             <summary>
-            The log object
+            The logger instance
             </summary>
         </member>
         <member name="F:SharpCryptoExchange.BaseClient.LastId">
@@ -423,8 +423,8 @@
             <summary>
             ctor
             </summary>
-            <param name="name">The name of the API this client is for</param>
-            <param name="options">The options for this client</param>
+            <param name="apiName">The name of the API this client is for</param>
+            <param name="clientOptions">The options for this client</param>
         </member>
         <member name="M:SharpCryptoExchange.BaseClient.AddApiClient``1(``0)">
             <summary>
@@ -475,11 +475,6 @@
             Generate a new unique id. The id is staticly stored so it is guarenteed to be unique across different client instances
             </summary>
             <returns></returns>
-        </member>
-        <member name="M:SharpCryptoExchange.BaseClient.HandleLogConfigChange">
-            <summary>
-            Handle a change in the client options log config
-            </summary>
         </member>
         <member name="M:SharpCryptoExchange.BaseClient.Dispose">
             <summary>
@@ -1799,12 +1794,12 @@
             <param name="source"></param>
             <returns></returns>
         </member>
-        <member name="M:SharpCryptoExchange.ExtensionMethods.ToJToken(System.String,SharpCryptoExchange.Logging.Log)">
+        <member name="M:SharpCryptoExchange.ExtensionMethods.ToJToken(System.String,Microsoft.Extensions.Logging.ILogger)">
             <summary>
             String to JToken
             </summary>
             <param name="stringData"></param>
-            <param name="log"></param>
+            <param name="logger"></param>
             <returns></returns>
         </member>
         <member name="M:SharpCryptoExchange.ExtensionMethods.ValidateIntValues(System.Int32,System.String,System.Int32[])">
@@ -2093,11 +2088,11 @@
             Rate limiter interface
             </summary>
         </member>
-        <member name="M:SharpCryptoExchange.Interfaces.IRateLimiter.LimitRequestAsync(SharpCryptoExchange.Logging.Log,System.String,System.Net.Http.HttpMethod,System.Boolean,System.Security.SecureString,SharpCryptoExchange.Objects.RateLimitingBehaviour,System.Int32,System.Threading.CancellationToken)">
+        <member name="M:SharpCryptoExchange.Interfaces.IRateLimiter.LimitRequestAsync(Microsoft.Extensions.Logging.ILogger,System.String,System.Net.Http.HttpMethod,System.Boolean,System.Security.SecureString,SharpCryptoExchange.Objects.RateLimitingBehaviour,System.Int32,System.Threading.CancellationToken)">
             <summary>
             Limit a request based on previous requests made
             </summary>
-            <param name="log">The logger</param>
+            <param name="logger">A logger instance</param>
             <param name="endpoint">The endpoint the request is for</param>
             <param name="method">The Http request method</param>
             <param name="signed">Whether the request is singed(private) or not</param>
@@ -2532,80 +2527,90 @@
             Websocket factory interface
             </summary>
         </member>
-        <member name="M:SharpCryptoExchange.Interfaces.IWebsocketFactory.CreateWebsocket(SharpCryptoExchange.Logging.Log,SharpCryptoExchange.Sockets.WebSocketParameters)">
+        <member name="M:SharpCryptoExchange.Interfaces.IWebsocketFactory.CreateWebsocket(Microsoft.Extensions.Logging.ILogger,SharpCryptoExchange.Sockets.WebSocketParameters)">
             <summary>
             Create a websocket for an url
             </summary>
-            <param name="log">The logger</param>
+            <param name="logger">The logger instance</param>
             <param name="parameters">The parameters to use for the connection</param>
             <returns></returns>
         </member>
-        <member name="T:SharpCryptoExchange.Logging.ConsoleLogger">
+        <member name="T:SharpCryptoExchange.Logging.LogHelper">
             <summary>
-            ILogger implementation for logging to the console
+            Uses the LoggerMessage attribute pattern to generate code that log messages wih good performance
             </summary>
         </member>
-        <member name="M:SharpCryptoExchange.Logging.ConsoleLogger.BeginScope``1(``0)">
-            <inheritdoc />
-        </member>
-        <member name="M:SharpCryptoExchange.Logging.ConsoleLogger.IsEnabled(Microsoft.Extensions.Logging.LogLevel)">
-            <inheritdoc />
-        </member>
-        <member name="M:SharpCryptoExchange.Logging.ConsoleLogger.Log``1(Microsoft.Extensions.Logging.LogLevel,Microsoft.Extensions.Logging.EventId,``0,System.Exception,System.Func{``0,System.Exception,System.String})">
-            <inheritdoc />
-        </member>
-        <member name="T:SharpCryptoExchange.Logging.DebugLogger">
+        <member name="M:SharpCryptoExchange.Logging.LogHelper.LogCriticalMessage(Microsoft.Extensions.Logging.ILogger,System.String,System.Exception)">
             <summary>
-            Default log writer, uses Trace.WriteLine
+            Log a critical message
             </summary>
+            <param name="logger"></param>
+            <param name="message"></param>
+            <param name="ex"></param>
         </member>
-        <member name="M:SharpCryptoExchange.Logging.DebugLogger.BeginScope``1(``0)">
-            <inheritdoc />
-        </member>
-        <member name="M:SharpCryptoExchange.Logging.DebugLogger.IsEnabled(Microsoft.Extensions.Logging.LogLevel)">
-            <inheritdoc />
-        </member>
-        <member name="M:SharpCryptoExchange.Logging.DebugLogger.Log``1(Microsoft.Extensions.Logging.LogLevel,Microsoft.Extensions.Logging.EventId,``0,System.Exception,System.Func{``0,System.Exception,System.String})">
-            <inheritdoc />
-        </member>
-        <member name="T:SharpCryptoExchange.Logging.Log">
+        <member name="M:SharpCryptoExchange.Logging.LogHelper.LogErrorMessage(Microsoft.Extensions.Logging.ILogger,System.String)">
             <summary>
-            Log implementation
+            Log a generic error message
             </summary>
+            <param name="logger"></param>
+            <param name="message"></param>
         </member>
-        <member name="F:SharpCryptoExchange.Logging.Log.writers">
+        <member name="M:SharpCryptoExchange.Logging.LogHelper.LogWarningMessage(Microsoft.Extensions.Logging.ILogger,System.String)">
             <summary>
-            List of ILogger implementations to forward the message to
+            Log a generic warning message
             </summary>
+            <param name="logger"></param>
+            <param name="message"></param>
         </member>
-        <member name="P:SharpCryptoExchange.Logging.Log.Level">
+        <member name="M:SharpCryptoExchange.Logging.LogHelper.LogInformationMessage(Microsoft.Extensions.Logging.ILogger,System.String)">
             <summary>
-            The verbosity of the logging, anything more verbose will not be forwarded to the writers
+            Log a generic information message
             </summary>
+            <param name="logger"></param>
+            <param name="message"></param>
         </member>
-        <member name="P:SharpCryptoExchange.Logging.Log.ClientName">
+        <member name="M:SharpCryptoExchange.Logging.LogHelper.LogDebugMessage(Microsoft.Extensions.Logging.ILogger,System.String)">
             <summary>
-            Client name
+            Log a generic debug message
             </summary>
+            <param name="logger"></param>
+            <param name="message"></param>
         </member>
-        <member name="M:SharpCryptoExchange.Logging.Log.#ctor(System.String)">
+        <member name="M:SharpCryptoExchange.Logging.LogHelper.LogTraceMessage(Microsoft.Extensions.Logging.ILogger,System.String)">
             <summary>
-            ctor
+            Log a generic trace message
             </summary>
-            <param name="clientName">The name of the client the logging is used in</param>
+            <param name="logger"></param>
+            <param name="message"></param>
         </member>
-        <member name="M:SharpCryptoExchange.Logging.Log.UpdateWriters(System.Collections.Generic.List{Microsoft.Extensions.Logging.ILogger})">
+        <member name="M:SharpCryptoExchange.Logging.LogHelper.LogLatencyCheck(Microsoft.Extensions.Logging.ILogger,System.Int32,System.Double,System.Double,System.Double,System.DateTimeOffset)">
             <summary>
-            Set the writers
+            Log a latency check information message
             </summary>
-            <param name="textWriters"></param>
+            <param name="logger"></param>
+            <param name="latencyCheckCount"></param>
+            <param name="latency"></param>
+            <param name="currentTimeDelta"></param>
+            <param name="averageTimeDelta"></param>
+            <param name="syncTime"></param>
         </member>
-        <member name="M:SharpCryptoExchange.Logging.Log.Write(Microsoft.Extensions.Logging.LogLevel,System.String)">
+        <member name="M:SharpCryptoExchange.Logging.LogHelper.LogCreatingRequest(Microsoft.Extensions.Logging.ILogger,System.Int32,System.Uri)">
             <summary>
-            Write a log entry
+            Log a "creating request" event
             </summary>
-            <param name="logLevel">The verbosity of the message</param>
-            <param name="message">The message to log</param>
+            <param name="logger">The logger instance</param>
+            <param name="requestId">Request ID</param>
+            <param name="uri">URI instance to request for</param>
+        </member>
+        <member name="M:SharpCryptoExchange.Logging.LogHelper.TraceJsonString(Microsoft.Extensions.Logging.ILogger,System.String)">
+            <summary>
+            Trace data string
+            </summary>
+            <remarks>
+            do not use in production, may contain sensitive data
+            </remarks>
+            <param name="logger">The logger instance</param>
+            <param name="dataString">JSON data string to log</param>
         </member>
         <member name="T:SharpCryptoExchange.Objects.ApiProxy">
             <summary>
@@ -3259,14 +3264,9 @@
             Base options, applicable to everything
             </summary>
         </member>
-        <member name="P:SharpCryptoExchange.Objects.BaseOptions.LogLevel">
+        <member name="P:SharpCryptoExchange.Objects.BaseOptions.Logger">
             <summary>
-            The minimum log level to output
-            </summary>
-        </member>
-        <member name="P:SharpCryptoExchange.Objects.BaseOptions.LogWriters">
-            <summary>
-            The log writers
+            The log writer
             </summary>
         </member>
         <member name="P:SharpCryptoExchange.Objects.BaseOptions.OutputOriginalData">
@@ -3553,7 +3553,7 @@
             <param name="onlyForSignedRequests">Only include calls that are signed in this limiter</param>
             <param name="excludeFromTotalRateLimit">Exclude requests with API key from the total rate limiter</param>
         </member>
-        <member name="M:SharpCryptoExchange.Objects.RateLimiter.LimitRequestAsync(SharpCryptoExchange.Logging.Log,System.String,System.Net.Http.HttpMethod,System.Boolean,System.Security.SecureString,SharpCryptoExchange.Objects.RateLimitingBehaviour,System.Int32,System.Threading.CancellationToken)">
+        <member name="M:SharpCryptoExchange.Objects.RateLimiter.LimitRequestAsync(Microsoft.Extensions.Logging.ILogger,System.String,System.Net.Http.HttpMethod,System.Boolean,System.Security.SecureString,SharpCryptoExchange.Objects.RateLimitingBehaviour,System.Int32,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
         <member name="T:SharpCryptoExchange.Objects.TimeSyncState">
@@ -3591,7 +3591,7 @@
             Time synchronization info
             </summary>
         </member>
-        <member name="P:SharpCryptoExchange.Objects.TimeSyncInfo.Log">
+        <member name="P:SharpCryptoExchange.Objects.TimeSyncInfo.Logger">
             <summary>
             Logger
             </summary>
@@ -3611,11 +3611,11 @@
             Time sync state for the API client
             </summary>
         </member>
-        <member name="M:SharpCryptoExchange.Objects.TimeSyncInfo.#ctor(SharpCryptoExchange.Logging.Log,System.Boolean,System.TimeSpan,SharpCryptoExchange.Objects.TimeSyncState)">
+        <member name="M:SharpCryptoExchange.Objects.TimeSyncInfo.#ctor(Microsoft.Extensions.Logging.ILogger,System.Boolean,System.TimeSpan,SharpCryptoExchange.Objects.TimeSyncState)">
             <summary>
             ctor
             </summary>
-            <param name="log"></param>
+            <param name="logger"></param>
             <param name="recalculationInterval"></param>
             <param name="syncTime"></param>
             <param name="syncState"></param>
@@ -3673,9 +3673,9 @@
             The bid list, should only be accessed using the bookLock
             </summary>
         </member>
-        <member name="F:SharpCryptoExchange.OrderBook.SymbolOrderBook.log">
+        <member name="F:SharpCryptoExchange.OrderBook.SymbolOrderBook._logger">
             <summary>
-            The log
+            The logger
             </summary>
         </member>
         <member name="F:SharpCryptoExchange.OrderBook.SymbolOrderBook.sequencesAreConsecutive">
@@ -3955,6 +3955,22 @@
         <member name="M:SharpCryptoExchange.Requests.Response.Close">
             <inheritdoc />
         </member>
+        <member name="T:SharpCryptoExchange.SharpCryptoExchangeException">
+            <summary>
+            Throw specific exception from this package if needed
+            </summary>
+            <remarks>
+            If you throw a general exception type, such as Exception or SystemException in a library or framework,<br />
+            it forces consumers to catch all exceptions, including unknown exceptions that they do not know how to handle.
+            </remarks>
+        </member>
+        <member name="M:SharpCryptoExchange.SharpCryptoExchangeException.#ctor(System.String,System.Exception)">
+            <summary>
+            Default constructor
+            </summary>
+            <param name="message">Exception message</param>
+            <param name="innerException">Prior catch exception</param>
+        </member>
         <member name="T:SharpCryptoExchange.Sockets.CryptoExchangeWebSocketClient">
             <summary>
             A wrapper around the ClientWebSocket
@@ -3970,9 +3986,9 @@
             Received messages lock
             </summary>
         </member>
-        <member name="F:SharpCryptoExchange.Sockets.CryptoExchangeWebSocketClient._log">
+        <member name="F:SharpCryptoExchange.Sockets.CryptoExchangeWebSocketClient._logger">
             <summary>
-            Log
+            The logger
             </summary>
         </member>
         <member name="P:SharpCryptoExchange.Sockets.CryptoExchangeWebSocketClient.Id">
@@ -4019,11 +4035,11 @@
         <member name="P:SharpCryptoExchange.Sockets.CryptoExchangeWebSocketClient.GetReconnectionUrl">
             <inheritdoc />
         </member>
-        <member name="M:SharpCryptoExchange.Sockets.CryptoExchangeWebSocketClient.#ctor(SharpCryptoExchange.Logging.Log,SharpCryptoExchange.Sockets.WebSocketParameters)">
+        <member name="M:SharpCryptoExchange.Sockets.CryptoExchangeWebSocketClient.#ctor(Microsoft.Extensions.Logging.ILogger,SharpCryptoExchange.Sockets.WebSocketParameters)">
             <summary>
             ctor
             </summary>
-            <param name="log">The log object to use</param>
+            <param name="logger">The log object to use</param>
             <param name="websocketParameters">The parameters for this socket</param>
         </member>
         <member name="M:SharpCryptoExchange.Sockets.CryptoExchangeWebSocketClient.ConnectAsync">
@@ -4680,7 +4696,7 @@
             Default websocket factory implementation
             </summary>
         </member>
-        <member name="M:SharpCryptoExchange.Sockets.WebsocketFactory.CreateWebsocket(SharpCryptoExchange.Logging.Log,SharpCryptoExchange.Sockets.WebSocketParameters)">
+        <member name="M:SharpCryptoExchange.Sockets.WebsocketFactory.CreateWebsocket(Microsoft.Extensions.Logging.ILogger,SharpCryptoExchange.Sockets.WebSocketParameters)">
             <inheritdoc />
         </member>
         <member name="T:SharpCryptoExchange.Sockets.WebSocketParameters">

@@ -57,9 +57,9 @@ namespace SharpCryptoExchange.Sockets
         protected readonly object _receivedMessagesLock;
 
         /// <summary>
-        /// Log
+        /// The logger
         /// </summary>
-        protected Log _log;
+        protected ILogger _logger;
 
         /// <inheritdoc />
         public int Id { get; }
@@ -116,12 +116,12 @@ namespace SharpCryptoExchange.Sockets
         /// <summary>
         /// ctor
         /// </summary>
-        /// <param name="log">The log object to use</param>
+        /// <param name="logger">The log object to use</param>
         /// <param name="websocketParameters">The parameters for this socket</param>
-        public CryptoExchangeWebSocketClient(Log log, WebSocketParameters websocketParameters)
+        public CryptoExchangeWebSocketClient(ILogger logger,WebSocketParameters websocketParameters)
         {
             Id = NextStreamId();
-            _log = log;
+            _logger = logger;
 
             Parameters = websocketParameters;
             _outgoingMessages = new List<DateTime>();
@@ -177,7 +177,7 @@ namespace SharpCryptoExchange.Sockets
 
         private async Task<bool> ConnectInternalAsync()
         {
-            _log.Write(LogLevel.Debug, $"Socket {Id} connecting");
+            LogHelper.LogDebugMessage(_logger, $"Socket {Id} connecting");
             try
             {
                 using CancellationTokenSource tcs = new(TimeSpan.FromSeconds(10));
@@ -185,11 +185,11 @@ namespace SharpCryptoExchange.Sockets
             }
             catch (Exception e)
             {
-                _log.Write(LogLevel.Debug, $"Socket {Id} connection failed: " + e.ToLogString());
+                LogHelper.LogDebugMessage(_logger, $"Socket {Id} connection failed: " + e.ToLogString());
                 return false;
             }
 
-            _log.Write(LogLevel.Debug, $"Socket {Id} connected to {Uri}");
+            LogHelper.LogDebugMessage(_logger, $"Socket {Id} connected to {Uri}");
             return true;
         }
 
@@ -198,13 +198,13 @@ namespace SharpCryptoExchange.Sockets
         {
             while (!_stopRequested)
             {
-                _log.Write(LogLevel.Debug, $"Socket {Id} starting processing tasks");
+                LogHelper.LogDebugMessage(_logger, $"Socket {Id} starting processing tasks");
                 _processState = ProcessState.Processing;
                 var sendTask = SendLoopAsync();
                 var receiveTask = ReceiveLoopAsync();
                 var timeoutTask = Parameters.Timeout != null && Parameters.Timeout > TimeSpan.FromSeconds(0) ? CheckTimeoutAsync() : Task.CompletedTask;
                 await Task.WhenAll(sendTask, receiveTask, timeoutTask).ConfigureAwait(false);
-                _log.Write(LogLevel.Debug, $"Socket {Id} processing tasks finished");
+                LogHelper.LogDebugMessage(_logger, $"Socket {Id} processing tasks finished");
 
                 _processState = ProcessState.WaitingForClose;
                 while (_closeTask == null)
@@ -232,14 +232,14 @@ namespace SharpCryptoExchange.Sockets
 
                 while (!_stopRequested)
                 {
-                    _log.Write(LogLevel.Debug, $"Socket {Id} attempting to reconnect");
+                    LogHelper.LogDebugMessage(_logger, $"Socket {Id} attempting to reconnect");
                     var task = GetReconnectionUrl?.Invoke();
                     if (task != null)
                     {
                         var reconnectUri = await task.ConfigureAwait(false);
                         if (reconnectUri != null && Parameters.Uri != reconnectUri)
                         {
-                            _log.Write(LogLevel.Debug, $"Socket {Id} reconnect URI set to {reconnectUri}");
+                            LogHelper.LogDebugMessage(_logger, $"Socket {Id} reconnect URI set to {reconnectUri}");
                             Parameters.Uri = reconnectUri;
                         }
                     }
@@ -272,7 +272,7 @@ namespace SharpCryptoExchange.Sockets
                 return;
 
             var bytes = Parameters.Encoding.GetBytes(data);
-            _log.Write(LogLevel.Trace, $"Socket {Id} Adding {bytes.Length} to sent buffer");
+            LogHelper.LogTraceMessage(_logger,  $"Socket {Id} Adding {bytes.Length} to sent buffer");
             _sendBuffer.Enqueue(bytes);
             _sendEvent.Set();
         }
@@ -283,7 +283,7 @@ namespace SharpCryptoExchange.Sockets
             if (_processState != ProcessState.Processing && IsOpen)
                 return;
 
-            _log.Write(LogLevel.Debug, $"Socket {Id} reconnect requested");
+            LogHelper.LogDebugMessage(_logger, $"Socket {Id} reconnect requested");
             _closeTask = CloseInternalAsync();
             await _closeTask.ConfigureAwait(false);
         }
@@ -296,7 +296,7 @@ namespace SharpCryptoExchange.Sockets
             {
                 if (_closeTask != null && !_closeTask.IsCompleted)
                 {
-                    _log.Write(LogLevel.Debug, $"Socket {Id} CloseAsync() waiting for existing close task");
+                    LogHelper.LogDebugMessage(_logger, $"Socket {Id} CloseAsync() waiting for existing close task");
                     await _closeTask.ConfigureAwait(false);
                     return;
                 }
@@ -305,11 +305,11 @@ namespace SharpCryptoExchange.Sockets
 
                 if (!IsOpen)
                 {
-                    _log.Write(LogLevel.Debug, $"Socket {Id} CloseAsync() socket not open");
+                    LogHelper.LogDebugMessage(_logger, $"Socket {Id} CloseAsync() socket not open");
                     return;
                 }
 
-                _log.Write(LogLevel.Debug, $"Socket {Id} closing");
+                LogHelper.LogDebugMessage(_logger, $"Socket {Id} closing");
                 _closeTask = CloseInternalAsync();
             }
             finally
@@ -321,7 +321,7 @@ namespace SharpCryptoExchange.Sockets
             if (_processTask != null)
                 await _processTask.ConfigureAwait(false);
             OnClose?.Invoke();
-            _log.Write(LogLevel.Debug, $"Socket {Id} closed");
+            LogHelper.LogDebugMessage(_logger, $"Socket {Id} closed");
         }
 
         /// <summary>
@@ -373,11 +373,11 @@ namespace SharpCryptoExchange.Sockets
             if (_disposed)
                 return;
 
-            _log.Write(LogLevel.Debug, $"Socket {Id} disposing");
+            LogHelper.LogDebugMessage(_logger, $"Socket {Id} disposing");
             _disposed = true;
             _socket.Dispose();
             _ctsSource.Dispose();
-            _log.Write(LogLevel.Trace, $"Socket {Id} disposed");
+            LogHelper.LogDebugMessage(_logger,  $"Socket {Id} disposed");
 
             GC.SuppressFinalize(this);
         }
@@ -413,14 +413,14 @@ namespace SharpCryptoExchange.Sockets
                             }
 
                             if (start != null)
-                                _log.Write(LogLevel.Debug, $"Socket {Id} sent delayed {Math.Round((DateTime.UtcNow - start.Value).TotalMilliseconds)}ms because of rate limit");
+                                LogHelper.LogDebugMessage(_logger, $"Socket {Id} sent delayed {Math.Round((DateTime.UtcNow - start.Value).TotalMilliseconds)}ms because of rate limit");
                         }
 
                         try
                         {
                             await _socket.SendAsync(new ArraySegment<byte>(data, 0, data.Length), WebSocketMessageType.Text, true, _ctsSource.Token).ConfigureAwait(false);
                             _outgoingMessages.Add(DateTime.UtcNow);
-                            _log.Write(LogLevel.Trace, $"Socket {Id} sent {data.Length} bytes");
+                            LogHelper.LogTraceMessage(_logger, $"Socket {Id} sent {data.Length} bytes");
                         }
                         catch (OperationCanceledException)
                         {
@@ -447,7 +447,7 @@ namespace SharpCryptoExchange.Sockets
             }
             finally
             {
-                _log.Write(LogLevel.Debug, $"Socket {Id} Send loop finished");
+                LogHelper.LogDebugMessage(_logger, $"Socket {Id} Send loop finished");
             }
         }
 
@@ -494,7 +494,7 @@ namespace SharpCryptoExchange.Sockets
                         if (receiveResult.MessageType == WebSocketMessageType.Close)
                         {
                             // Connection closed unexpectedly        
-                            _log.Write(LogLevel.Debug, $"Socket {Id} received `Close` message");
+                            LogHelper.LogDebugMessage(_logger, $"Socket {Id} received `Close` message");
                             _closeTask = CloseInternalAsync();
                             break;
                         }
@@ -503,7 +503,7 @@ namespace SharpCryptoExchange.Sockets
                         {
                             // We received data, but it is not complete, write it to a memory stream for reassembling
                             multiPartMessage = true;
-                            _log.Write(LogLevel.Trace, $"Socket {Id} received {receiveResult.Count} bytes in partial message");
+                            LogHelper.LogTraceMessage(_logger, $"Socket {Id} received {receiveResult.Count} bytes in partial message");
                             memoryStream ??= new MemoryStream();
                             await memoryStream.WriteAsync(buffer.Array.AsMemory(buffer.Offset, receiveResult.Count)).ConfigureAwait(false);
                         }
@@ -512,13 +512,13 @@ namespace SharpCryptoExchange.Sockets
                             if (!multiPartMessage)
                             {
                                 // Received a complete message and it's not multi part
-                                _log.Write(LogLevel.Trace, $"Socket {Id} received {receiveResult.Count} bytes in single message");
+                                LogHelper.LogTraceMessage(_logger, $"Socket {Id} received {receiveResult.Count} bytes in single message");
                                 HandleMessage(buffer.Array!, buffer.Offset, receiveResult.Count, receiveResult.MessageType);
                             }
                             else
                             {
                                 // Received the end of a multipart message, write to memory stream for reassembling
-                                _log.Write(LogLevel.Trace, $"Socket {Id} received {receiveResult.Count} bytes in partial message");
+                                LogHelper.LogTraceMessage(_logger, $"Socket {Id} received {receiveResult.Count} bytes in partial message");
                                 memoryStream ??= new MemoryStream();
                                 await memoryStream.WriteAsync(buffer.Array.AsMemory(buffer.Offset, receiveResult.Count)).ConfigureAwait(false);
                             }
@@ -549,12 +549,14 @@ namespace SharpCryptoExchange.Sockets
                         if (receiveResult?.EndOfMessage == true)
                         {
                             // Reassemble complete message from memory stream
-                            _log.Write(LogLevel.Trace, $"Socket {Id} reassembled message of {memoryStream.Length} bytes");
+                            LogHelper.LogTraceMessage(_logger, $"Socket {Id} reassembled message of {memoryStream.Length} bytes");
                             HandleMessage(memoryStream.ToArray(), 0, (int)memoryStream.Length, receiveResult.MessageType);
                             memoryStream.Dispose();
                         }
                         else
-                            _log.Write(LogLevel.Trace, $"Socket {Id} discarding incomplete message of {memoryStream.Length} bytes");
+                        {
+                            LogHelper.LogTraceMessage(_logger, $"Socket {Id} discarding incomplete message of {memoryStream.Length} bytes");
+                        }
                     }
                 }
             }
@@ -568,7 +570,7 @@ namespace SharpCryptoExchange.Sockets
             }
             finally
             {
-                _log.Write(LogLevel.Debug, $"Socket {Id} Receive loop finished");
+                LogHelper.LogDebugMessage(_logger, $"Socket {Id} Receive loop finished");
             }
         }
 
@@ -595,7 +597,7 @@ namespace SharpCryptoExchange.Sockets
                 }
                 catch (Exception e)
                 {
-                    _log.Write(LogLevel.Error, $"Socket {Id} unhandled exception during byte data interpretation: " + e.ToLogString());
+                    LogHelper.LogErrorMessage(_logger, $"Socket {Id} unhandled exception during byte data interpretation: " + e.ToLogString());
                     return;
                 }
             }
@@ -610,7 +612,7 @@ namespace SharpCryptoExchange.Sockets
                 }
                 catch (Exception e)
                 {
-                    _log.Write(LogLevel.Error, $"Socket {Id} unhandled exception during string data interpretation: " + e.ToLogString());
+                    LogHelper.LogErrorMessage(_logger, $"Socket {Id} unhandled exception during string data interpretation: " + e.ToLogString());
                     return;
                 }
             }
@@ -622,7 +624,7 @@ namespace SharpCryptoExchange.Sockets
             }
             catch (Exception e)
             {
-                _log.Write(LogLevel.Error, $"Socket {Id} unhandled exception during message processing: " + e.ToLogString());
+                LogHelper.LogErrorMessage(_logger, $"Socket {Id} unhandled exception during message processing: " + e.ToLogString());
             }
         }
 
@@ -668,7 +670,7 @@ namespace SharpCryptoExchange.Sockets
         /// <returns></returns>
         protected async Task CheckTimeoutAsync()
         {
-            _log.Write(LogLevel.Debug, $"Socket {Id} Starting task checking for no data received for {Parameters.Timeout}");
+            LogHelper.LogDebugMessage(_logger, $"Socket {Id} Starting task checking for no data received for {Parameters.Timeout}");
             LastActionTime = DateTime.UtcNow;
             try
             {
@@ -679,7 +681,7 @@ namespace SharpCryptoExchange.Sockets
 
                     if (DateTime.UtcNow - LastActionTime > Parameters.Timeout)
                     {
-                        _log.Write(LogLevel.Warning, $"Socket {Id} No data received for {Parameters.Timeout}, reconnecting socket");
+                        LogHelper.LogWarningMessage(_logger, $"Socket {Id} No data received for {Parameters.Timeout}, reconnecting socket");
                         _ = ReconnectAsync().ConfigureAwait(false);
                         return;
                     }
